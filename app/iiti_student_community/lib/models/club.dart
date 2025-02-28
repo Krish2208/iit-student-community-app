@@ -26,7 +26,11 @@ class Club {
       description: data['description'],
       photoUrl: data['photoUrl'],
       bannerUrl: data['bannerUrl'],
-      isSubscribed: data['subscribers']?.contains(FirebaseAuth.instance.currentUser?.uid) ?? false,
+      isSubscribed:
+          data['subscribers']?.contains(
+            FirebaseAuth.instance.currentUser?.uid,
+          ) ??
+          false,
     );
   }
 }

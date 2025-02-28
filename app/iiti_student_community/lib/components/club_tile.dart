@@ -28,12 +28,12 @@ class ClubTile extends StatelessWidget {
           children: [
             CircleAvatar(
               radius: 30,
-              backgroundImage: club.photoUrl != null
-                  ? NetworkImage(club.photoUrl!)
-                  : null,
-              child: club.photoUrl == null
-                  ? const Icon(Icons.groups, size: 30)
-                  : null,
+              backgroundImage:
+                  club.photoUrl != null ? NetworkImage(club.photoUrl!) : null,
+              child:
+                  club.photoUrl == null
+                      ? const Icon(Icons.groups, size: 30)
+                      : null,
             ),
             const SizedBox(height: 8.0),
             Padding(

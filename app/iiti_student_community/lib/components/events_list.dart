@@ -15,11 +15,15 @@ class EventsListSection extends StatelessWidget {
     );
 
     return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('events')
-          .where('dateTime', isGreaterThanOrEqualTo: Timestamp.fromDate(today))
-          .orderBy('dateTime', descending: false)
-          .snapshots(),
+      stream:
+          FirebaseFirestore.instance
+              .collection('events')
+              .where(
+                'dateTime',
+                isGreaterThanOrEqualTo: Timestamp.fromDate(today),
+              )
+              .orderBy('dateTime', descending: false)
+              .snapshots(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
@@ -34,9 +38,8 @@ class EventsListSection extends StatelessWidget {
         }
 
         // Convert the documents to Event objects
-        final events = snapshot.data!.docs
-            .map((doc) => Event.fromFirestore(doc))
-            .toList();
+        final events =
+            snapshot.data!.docs.map((doc) => Event.fromFirestore(doc)).toList();
 
         return ListView.builder(
           padding: const EdgeInsets.all(16.0),

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:iiti_student_community/models/event.dart';
 
-
 class MapViewPage extends StatefulWidget {
   final Event event;
 
@@ -40,9 +39,7 @@ class _MapViewPageState extends State<MapViewPage> {
     };
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.event.location),
-      ),
+      appBar: AppBar(title: Text(widget.event.location)),
       body: GoogleMap(
         onMapCreated: _onMapCreated,
         initialCameraPosition: CameraPosition(

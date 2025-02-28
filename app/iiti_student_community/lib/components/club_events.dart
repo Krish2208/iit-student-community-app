@@ -17,12 +17,16 @@ class ClubEventsSection extends StatelessWidget {
     );
 
     return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('events')
-          .where('organizerId', isEqualTo: clubId)
-          .where('dateTime', isGreaterThanOrEqualTo: Timestamp.fromDate(today))
-          .orderBy('dateTime', descending: false)
-          .snapshots(),
+      stream:
+          FirebaseFirestore.instance
+              .collection('events')
+              .where('organizerId', isEqualTo: clubId)
+              .where(
+                'dateTime',
+                isGreaterThanOrEqualTo: Timestamp.fromDate(today),
+              )
+              .orderBy('dateTime', descending: false)
+              .snapshots(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const SizedBox(
@@ -43,9 +47,8 @@ class ClubEventsSection extends StatelessWidget {
         }
 
         // Convert the documents to Event objects
-        final events = snapshot.data!.docs
-            .map((doc) => Event.fromFirestore(doc))
-            .toList();
+        final events =
+            snapshot.data!.docs.map((doc) => Event.fromFirestore(doc)).toList();
 
         return ListView.builder(
           shrinkWrap: true,

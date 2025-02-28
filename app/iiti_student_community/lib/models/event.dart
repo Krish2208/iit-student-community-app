@@ -9,7 +9,8 @@ class Event {
   final String location;
   final DateTime dateTime;
   final String? posterUrl;
-  final LatLng? coordinates; // Add coordinates field
+  final LatLng? coordinates;
+  final List<String> attendees;
 
   String? organizerName;
   String? organizerPhotoUrl;
@@ -25,6 +26,7 @@ class Event {
     this.coordinates,
     this.organizerName,
     this.organizerPhotoUrl,
+    required this.attendees,
   });
 
   factory Event.fromFirestore(DocumentSnapshot doc) {
@@ -46,6 +48,7 @@ class Event {
       dateTime: (data['dateTime'] as Timestamp).toDate(),
       posterUrl: data['posterUrl'],
       coordinates: coordinates,
+      attendees: List<String>.from(data['attendees'] ?? []),
     );
   }
 
@@ -57,11 +60,15 @@ class Event {
       'location': location,
       'dateTime': Timestamp.fromDate(dateTime),
       'posterUrl': posterUrl,
+      'attendees': attendees,
     };
 
     // Add coordinates if they exist
     if (coordinates != null) {
-      data['coordinates'] = GeoPoint(coordinates!.latitude, coordinates!.longitude);
+      data['coordinates'] = GeoPoint(
+        coordinates!.latitude,
+        coordinates!.longitude,
+      );
     }
 
     return data;

@@ -25,10 +25,11 @@ class SubscribedEventsSection extends StatelessWidget {
     );
 
     return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('clubs')
-          .where('subscribers', arrayContains: userId)
-          .snapshots(),
+      stream:
+          FirebaseFirestore.instance
+              .collection('clubs')
+              .where('subscribers', arrayContains: userId)
+              .snapshots(),
       builder: (context, clubsSnapshot) {
         if (clubsSnapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
@@ -48,12 +49,16 @@ class SubscribedEventsSection extends StatelessWidget {
         final clubIds = clubsSnapshot.data!.docs.map((doc) => doc.id).toList();
 
         return StreamBuilder<QuerySnapshot>(
-          stream: FirebaseFirestore.instance
-              .collection('events')
-              .where('organizerId', whereIn: clubIds)
-              .where('dateTime', isGreaterThanOrEqualTo: Timestamp.fromDate(today))
-              .orderBy('dateTime', descending: false)
-              .snapshots(),
+          stream:
+              FirebaseFirestore.instance
+                  .collection('events')
+                  .where('organizerId', whereIn: clubIds)
+                  .where(
+                    'dateTime',
+                    isGreaterThanOrEqualTo: Timestamp.fromDate(today),
+                  )
+                  .orderBy('dateTime', descending: false)
+                  .snapshots(),
           builder: (context, eventsSnapshot) {
             if (eventsSnapshot.connectionState == ConnectionState.waiting) {
               return const Center(child: CircularProgressIndicator());
@@ -70,9 +75,10 @@ class SubscribedEventsSection extends StatelessWidget {
             }
 
             // Convert the documents to Event objects
-            final events = eventsSnapshot.data!.docs
-                .map((doc) => Event.fromFirestore(doc))
-                .toList();
+            final events =
+                eventsSnapshot.data!.docs
+                    .map((doc) => Event.fromFirestore(doc))
+                    .toList();
 
             return ListView.builder(
               padding: const EdgeInsets.all(16.0),

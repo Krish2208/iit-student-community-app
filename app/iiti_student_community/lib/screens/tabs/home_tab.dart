@@ -18,10 +18,7 @@ class HomeTab extends StatelessWidget {
               children: [
                 const Text(
                   'Upcoming Events',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                 ),
                 const Spacer(),
                 TextButton(
@@ -40,9 +37,7 @@ class HomeTab extends StatelessWidget {
           ),
 
           // Events list from subscribed clubs
-          Expanded(
-            child: SubscribedEventsSection(),
-          ),
+          Expanded(child: SubscribedEventsSection()),
         ],
       ),
     );

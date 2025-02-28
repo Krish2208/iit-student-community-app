@@ -9,10 +9,11 @@ class ClubsGridSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('clubs')
-          .orderBy('name')
-          .snapshots(),
+      stream:
+          FirebaseFirestore.instance
+              .collection('clubs')
+              .orderBy('name')
+              .snapshots(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(
@@ -34,9 +35,8 @@ class ClubsGridSection extends StatelessWidget {
           );
         }
 
-        final clubs = snapshot.data!.docs
-            .map((doc) => Club.fromFirestore(doc))
-            .toList();
+        final clubs =
+            snapshot.data!.docs.map((doc) => Club.fromFirestore(doc)).toList();
 
         return GridView.builder(
           shrinkWrap: true,
