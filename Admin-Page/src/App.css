@@ -1,0 +1,19 @@
+/* Header Styles */
+.header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  z-index: 1000;
+}
+
+/* Sidebar Styles */
+.sidebar {
+  top: 64px; /* Adjust based on header height */
+}
+
+/* Main Content Styles */
+main {
+  background-size: cover;
+  background-position: center;
+}
