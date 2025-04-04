@@ -3,12 +3,12 @@ import { getAuth, GoogleAuthProvider } from "firebase/auth";
 import { getFirestore } from "firebase/firestore"; // Add this
 
 const firebaseConfig = {
-  apiKey: "<YOUR-API-KEY>",
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: "iit-indore-student.firebaseapp.com",
   projectId: "iit-indore-student",
   storageBucket: "iit-indore-student.appspot.com",
-  messagingSenderId: "<YOUR-MESSAGING-SENDER-ID>",
-  appId: "<YOUR-APP-ID>",
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
   measurementId: "G-27QP57MMKX"
 };
 
