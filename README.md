@@ -10,7 +10,9 @@ A Flutter-based platform for managing student clubs, events, and community engag
 - Google Cloud SDK
 
 Follow our detailed setup guide:  
-[Installation Guide](./InstallationREADME.md)
+1. [Flutter Installation Guide](./FlutterInstallationREADME.md)
+2. [Admin Page Installation Guide](./AdminPageInstallationREADME.md)
+3. [Cloud Functions Installation Guide](./CloudFunctionsInstallationREADME.md)
 
 ## 🛠 Tech Stack
 **Core Framework**  
