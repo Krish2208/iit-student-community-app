@@ -18,18 +18,12 @@ class EventDetailsPage extends StatefulWidget {
 
 class _EventDetailsPageState extends State<EventDetailsPage> {
   bool _isRegistering = false;
-  late Stream<DocumentSnapshot> _eventStream;
   late Event _currentEvent;
 
   @override
   void initState() {
     super.initState();
     _currentEvent = widget.event;
-    _eventStream =
-        FirebaseFirestore.instance
-            .collection('events')
-            .doc(widget.event.id)
-            .snapshots();
   }
 
   Future<void> _toggleRegistration() async {
@@ -84,29 +78,7 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<DocumentSnapshot>(
-      stream: _eventStream,
-      builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          return Scaffold(
-            appBar: AppBar(title: const Text('Event Details')),
-            body: const Center(child: Text('Something went wrong')),
-          );
-        }
-
-        if (snapshot.connectionState == ConnectionState.waiting &&
-            !snapshot.hasData) {
-          return Scaffold(
-            appBar: AppBar(title: const Text('Event Details')),
-            body: const Center(child: CircularProgressIndicator()),
-          );
-        }
-
-        if (snapshot.hasData && snapshot.data!.exists) {
-          _currentEvent = Event.fromFirestore(snapshot.data!);
-        }
-
-        return Scaffold(
+    return Scaffold(
           appBar: AppBar(title: Text(_currentEvent.name), elevation: 0),
           body: SingleChildScrollView(
             child: Column(
@@ -249,9 +221,7 @@ class _EventDetailsPageState extends State<EventDetailsPage> {
             ),
           ),
         );
-      },
-    );
-  }
+      }
 
   Widget _buildRegistrationButton() {
     final user = FirebaseAuth.instance.currentUser;

@@ -12,7 +12,12 @@ import 'package:iiti_student_community/wrappers/auth_wrapper.dart';
 // Background message handler must be top-level function
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  await Firebase.initializeApp();
+  // Need to initialize Firebase before doing anything with the message
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  
+  // Log background message for debugging
+  print('Background message received: ${message.messageId}');
+  print('Background message data: ${message.data}');
 }
 
 Future<void> main() async {
@@ -23,7 +28,13 @@ Future<void> main() async {
   // Register background handler
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
   
-  runApp(const MyApp());
+  runApp(MultiProvider(
+    providers: [
+      ChangeNotifierProvider(create: (_) => AuthService()),
+      Provider<NotificationService>(create: (_) => NotificationService()),
+    ],
+    child: const MyApp(),
+  ));
 }
 
 class MyApp extends StatelessWidget {
@@ -31,19 +42,16 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MultiProvider(
-      providers: [
-        ChangeNotifierProvider(create: (_) => AuthService()),
-      ],
-      child: MaterialApp(
-        title: 'My App',
-        theme: ThemeData(primarySwatch: Colors.blue),
-        home: const AuthWrapper(),
+    return MaterialApp(
+      title: 'IITI Student Community',
+      theme: ThemeData(
+        primarySwatch: Colors.blue,
+        visualDensity: VisualDensity.adaptivePlatformDensity,
       ),
+      home: const AuthWrapper(),
     );
   }
 }
-
 
 // class MyApp extends StatelessWidget {
 //   const MyApp({super.key});

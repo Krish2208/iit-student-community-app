@@ -70,45 +70,80 @@ exports.notifyNewEvent = functions.firestore
         topic: `club_${organizerId}`,
       };
 
-      // Send the message
-      const fcmResponse = await getMessaging().send(message);
-      console.log("Successfully sent message:", fcmResponse);
-
-      // Also store in Firestore for notification history
-      const subscribers = clubData.subscribers || [];
-      
-      if (subscribers.length > 0) {
-        const batch = admin.firestore().batch();
-        const maxBatchSize = 500; // Firestore batch write limit
+      // Send the message with retry
+      try {
+        const fcmResponse = await getMessaging().send(message);
+        console.log("Successfully sent message:", fcmResponse);
+      } catch (fcmError) {
+        console.error("FCM send error:", fcmError);
         
-        for (let i = 0; i < subscribers.length; i += maxBatchSize) {
-          const currentBatch = subscribers.slice(i, i + maxBatchSize);
-          const currentBatchObj = admin.firestore().batch();
-          
-          for (const userId of currentBatch) {
-            if (!userId) continue; // Skip empty user IDs
+        // If topic messaging failed, try to send to individual tokens as fallback
+        if (clubData.subscribers && clubData.subscribers.length > 0) {
+          try {
+            // Get tokens for all subscribers
+            const tokenSnapshots = await Promise.all(
+              clubData.subscribers.map(userId => 
+                admin.firestore().collection('users').doc(userId).get()
+              )
+            );
             
-            const notificationRef = admin
-              .firestore()
-              .collection("notifications")
-              .doc();
-              
-            currentBatchObj.set(notificationRef, {
-              userId: userId,
-              title: notificationTitle,
-              body: notificationBody,
-              eventId: eventId,
-              clubId: organizerId,
-              photoUrl: clubData.photoUrl || null,
-              read: false,
-              createdAt: admin.firestore.FieldValue.serverTimestamp(),
-              type: "new_event"
+            const tokens = [];
+            tokenSnapshots.forEach(doc => {
+              if (doc.exists && doc.data().fcmTokens) {
+                tokens.push(...doc.data().fcmTokens);
+              }
             });
+            
+            if (tokens.length > 0) {
+              // Send in batches of 500
+              const tokenChunks = [];
+              for (let i = 0; i < tokens.length; i += 500) {
+                tokenChunks.push(tokens.slice(i, i + 500));
+              }
+              
+              await Promise.all(tokenChunks.map(chunk => {
+                const multicastMessage = {
+                  ...message,
+                  tokens: chunk,
+                };
+                delete multicastMessage.topic;
+                return getMessaging().sendMulticast(multicastMessage);
+              }));
+              
+              console.log("Sent fallback individual notifications");
+            }
+          } catch (tokenError) {
+            console.error("Token fallback error:", tokenError);
           }
-          
-          await currentBatchObj.commit();
         }
       }
+
+      // Store a single notification document with a map of read statuses
+      const notificationRef = admin
+        .firestore()
+        .collection("notifications")
+        .doc();
+      
+      const subscribers = clubData.subscribers || [];
+      const readStatusMap = {};
+      
+      // Initialize read status for all subscribers
+      subscribers.forEach(userId => {
+        if (userId) {
+          readStatusMap[userId] = false;
+        }
+      });
+      
+      await notificationRef.set({
+        title: notificationTitle,
+        body: notificationBody,
+        eventId: eventId,
+        clubId: organizerId,
+        photoUrl: clubData.photoUrl || null,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        type: "new_event",
+        readStatus: readStatusMap
+      });
 
       return null;
     } catch (error) {

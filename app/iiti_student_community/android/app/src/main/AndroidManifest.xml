@@ -1,6 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application
-        android:label="iiti_student_community"
+        android:label="IITI Student Community"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <service

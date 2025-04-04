@@ -19,6 +19,24 @@ class NotificationService {
   
   // Callback for navigation when a notification is tapped
   Function(String eventId)? onEventNotificationTapped;
+
+  // Mark notifications as read
+  Future<void> _markNotificationAsRead(String eventId) async {
+    String? userId = _auth.currentUser?.uid;
+    if (userId != null) {
+      // from the notifications collection get the notification where eventId is equal to eventId
+      await _firestore.collection('notifications').where('eventId', isEqualTo: eventId).get().then((value) {
+        for (var doc in value.docs) {
+          // update the notification document to mark read
+          _firestore.collection('notifications').doc(doc.id).update({'readStatus.$userId': true}).then((_) {
+            print('Notification marked as read');
+          }).catchError((error) {
+            print('Failed to mark notification as read: $error');
+          });
+        }
+      });
+    }
+  }
   
   // Initialize the service
   Future<void> init({Function(String eventId)? onNotificationTap}) async {
@@ -46,6 +64,7 @@ class NotificationService {
             Map<String, dynamic> data = json.decode(response.payload!);
             if (data['eventId'] != null && onEventNotificationTapped != null) {
               onEventNotificationTapped!(data['eventId']);
+              _markNotificationAsRead(data['eventId']);
             }
           }
         },
