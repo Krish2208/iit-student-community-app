@@ -138,6 +138,17 @@ MAPS_API_KEY=YOUR_API_KEY
 
 ---
 
+## 5.2 Configure another API Key
+
+1. Obtain a **Google Maps API Key** from the [GCP Console](https://console.cloud.google.com/apis/credentials).
+2. Create a `.env` file similar to `.env.example`
+2. Replace the above API key in `GOOGLE_API_KEY` inside the `.env` file.
+
+# 6. RazorPay SDK Integration
+
+1. Obtain a **RazorPay API** from the [RazorPay Console](https://easy.razorpay.com/).
+2. Replace the above API key in `RAZORPAY_KEY` inside the `.env` file.
+
 ## 6. Build and Deploy
 
 1. Validate all configurations:
