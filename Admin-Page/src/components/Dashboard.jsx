@@ -6,24 +6,28 @@ export default function Dashboard() {
   const [events, setEvents] = useState([]);
   const [merchandise, setMerchandise] = useState([]);
   const [clubs, setClubs] = useState([]);
-  const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // Fetch all data for dashboard
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [eventsSnapshot, merchSnapshot, clubsSnapshot, usersSnapshot] = await Promise.all([
+        const [eventsSnapshot, merchSnapshot, clubsSnapshot] = await Promise.all([
           getDocs(collection(db, 'events')),
           getDocs(collection(db, 'merchandise')),
           getDocs(collection(db, 'clubs')),
-          getDocs(collection(db, 'users'))
         ]);
 
-        setEvents(eventsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        const eventsData = eventsSnapshot.docs.map(doc => ({ 
+          id: doc.id, 
+          ...doc.data(),
+          // Convert Firestore Timestamp to Date if needed
+          date: doc.data().date?.toDate ? doc.data().date.toDate() : new Date(doc.data().date)
+        }));
+        
+        setEvents(eventsData);
         setMerchandise(merchSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
         setClubs(clubsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-        setUsers(usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       } catch (error) {
         console.error("Error fetching dashboard data:", error);
       } finally {
@@ -38,6 +42,14 @@ export default function Dashboard() {
     return <div className="flex justify-center items-center h-64">Loading dashboard data...</div>;
   }
 
+  // Filter events to only include future dates
+  const upcomingEvents = events.filter(event => {
+    const eventDate = new Date(event.date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Reset time to midnight for accurate date comparison
+    return eventDate >= today;
+  });
+
   // Calculate statistics
   const stats = [
     { 
@@ -47,10 +59,10 @@ export default function Dashboard() {
       icon: '📅'
     },
     { 
-      title: 'Event Participants', 
-      value: events.reduce((sum, event) => sum + (Number(event.participants) || 0), 0), 
+      title: 'Upcoming Events', 
+      value: upcomingEvents.length,
       color: 'bg-green-100 text-green-800',
-      icon: '👥'
+      icon: '📌'
     },
     { 
       title: 'Merchandise Items', 
@@ -60,43 +72,31 @@ export default function Dashboard() {
     },
     { 
       title: 'Active Clubs', 
-      value: clubs.filter(club => club.status === 'active').length, 
+      value: clubs.length, 
       color: 'bg-yellow-100 text-yellow-800',
       icon: '🏛️'
-    },
-    { 
-      title: 'Total Users', 
-      value: users.length, 
-      color: 'bg-red-100 text-red-800',
-      icon: '👤'
-    },
-    { 
-      title: 'Admin Users', 
-      value: users.filter(user => user.role === 'admin').length, 
-      color: 'bg-indigo-100 text-indigo-800',
-      icon: '🔒'
     }
   ];
 
   // Recent activities data
   const recentActivities = [
-    ...events.slice(0, 3).map(event => ({
+    ...upcomingEvents.slice(0, 3).map(event => ({
       type: 'event',
       title: event.name,
-      date: event.date,
-      description: `Scheduled for ${event.location} with ${event.participants} participants`
+      date: event.date.toLocaleDateString(),
+      description: `At ${event.location}`
     })),
     ...merchandise.slice(0, 2).map(item => ({
       type: 'merchandise',
       title: item.name,
       date: 'Recently added',
-      description: `${item.stock} in stock at ₹${item.price} each`
+      description: `₹${item.price}`
     })),
     ...clubs.slice(0, 2).map(club => ({
       type: 'club',
       title: club.name,
-      date: 'Active',
-      description: `Meets ${club.meetingSchedule} - ${club.category} club`
+      date: 'Recently added',
+      description: club.description?.substring(0, 50) + (club.description?.length > 50 ? '...' : '')
     }))
   ].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 5);
 
@@ -105,7 +105,7 @@ export default function Dashboard() {
       <h1 className="text-3xl font-bold text-college-primary">Dashboard Overview</h1>
       
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {stats.map((stat, index) => (
           <div key={index} className={`p-4 rounded-lg shadow ${stat.color}`}>
             <div className="flex items-center justify-between">
@@ -121,40 +121,42 @@ export default function Dashboard() {
 
       {/* Quick Overview Sections */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Upcoming Events */}
+        {/* Upcoming Events - Now only shows future events */}
         <div className="bg-white p-6 rounded-lg shadow-sm">
           <h2 className="text-xl font-semibold mb-4 flex items-center">
             <span className="mr-2">📅</span> Upcoming Events
           </h2>
           <div className="space-y-4">
-            {events.slice(0, 3).map(event => (
-              <div key={event.id} className="border-b pb-3 last:border-0">
-                <h3 className="font-medium">{event.name}</h3>
-                <p className="text-sm text-gray-600">{event.date} at {event.location}</p>
-                <p className="text-sm">{event.participants} participants</p>
-              </div>
-            ))}
-            {events.length === 0 && <p className="text-gray-500">No upcoming events</p>}
+            {upcomingEvents
+              .sort((a, b) => new Date(a.date) - new Date(b.date))
+              .slice(0, 3)
+              .map(event => (
+                <div key={event.id} className="border-b pb-3 last:border-0">
+                  <h3 className="font-medium">{event.name}</h3>
+                  <p className="text-sm text-gray-600">
+                    {event.date.toLocaleDateString()} at {event.location}
+                  </p>
+                </div>
+              ))}
+            {upcomingEvents.length === 0 && (
+              <p className="text-gray-500">No upcoming events scheduled</p>
+            )}
           </div>
         </div>
 
-        {/* Merchandise Status */}
+        {/* Merchandise Items */}
         <div className="bg-white p-6 rounded-lg shadow-sm">
           <h2 className="text-xl font-semibold mb-4 flex items-center">
-            <span className="mr-2">🛍️</span> Merchandise Status
+            <span className="mr-2">🛍️</span> Recent Merchandise
           </h2>
           <div className="space-y-4">
             {merchandise.slice(0, 3).map(item => (
               <div key={item.id} className="border-b pb-3 last:border-0">
                 <div className="flex justify-between items-center">
                   <h3 className="font-medium">{item.name}</h3>
-                  <span className={`px-2 py-1 text-xs rounded-full ${
-                    item.status === 'available' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                  }`}>
-                    {item.status}
-                  </span>
+                  <span className="text-sm">₹{item.price}</span>
                 </div>
-                <p className="text-sm">₹{item.price} • {item.stock} in stock</p>
+                <p className="text-sm text-gray-600">{item.type}</p>
               </div>
             ))}
             {merchandise.length === 0 && <p className="text-gray-500">No merchandise items</p>}
@@ -182,26 +184,6 @@ export default function Dashboard() {
             </div>
           ))}
           {recentActivities.length === 0 && <p className="text-gray-500">No recent activities</p>}
-        </div>
-      </div>
-
-      {/* Active Clubs */}
-      <div className="bg-white p-6 rounded-lg shadow-sm">
-        <h2 className="text-xl font-semibold mb-4 flex items-center">
-          <span className="mr-2">🏛️</span> Active Clubs
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {clubs.filter(club => club.status === 'active').slice(0, 6).map(club => (
-            <div key={club.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
-              <h3 className="font-medium">{club.name}</h3>
-              <p className="text-sm text-gray-600 capitalize">{club.category}</p>
-              <p className="text-sm mt-2">{club.description.substring(0, 80)}...</p>
-              <p className="text-xs text-gray-500 mt-2">Meets: {club.meetingSchedule}</p>
-            </div>
-          ))}
-          {clubs.filter(club => club.status === 'active').length === 0 && (
-            <p className="text-gray-500">No active clubs</p>
-          )}
         </div>
       </div>
     </div>
