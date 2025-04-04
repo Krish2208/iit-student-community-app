@@ -1,52 +1,34 @@
-import { useState, useEffect } from 'react';
-import { db } from '../firebase';  // Only import db from firebase.js
-import { 
-  collection, 
-  addDoc, 
-  onSnapshot, 
-  updateDoc, 
-  deleteDoc, 
-  doc, 
-  arrayUnion, 
-  arrayRemove,
-  GeoPoint
-} from 'firebase/firestore';
-import { getAuth } from 'firebase/auth';
-
-// CORRECT STORAGE IMPORTS:
-import { 
-  ref, 
-  uploadBytesResumable,  // This comes from storage
-  getDownloadURL 
-} from 'firebase/storage';
-import { storage } from '../firebase';  // Import storage instance
+import { useState, useEffect } from "react";
+import { db } from "../firebase";
+import {
+  collection,
+  addDoc,
+  onSnapshot,
+  updateDoc,
+  deleteDoc,
+  doc,
+  GeoPoint,
+} from "firebase/firestore";
+import { getAuth } from "firebase/auth";
+import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
+import { storage } from "../firebase";
 
 export default function EventManagement() {
   const [events, setEvents] = useState([]);
-  const [newEvent, setNewEvent] = useState({
-    name: '',
-    description: '',
-    organizerId: '',
-    location: '',
-    dateTime: '',
+  const [formData, setFormData] = useState({
+    name: "",
+    description: "",
+    organizerId: "",
+    location: "",
+    dateTime: "",
     posterFile: null,
-    coordinates: { lat: '', lng: '' },
-    attendees: []
+    posterUrl: "",
+    coordinates: { lat: "", lng: "" },
+    attendees: [],
   });
 
-  const [editingEventId, setEditingEventId] = useState(null);
-  const [editedEvent, setEditedEvent] = useState({
-    name: '',
-    description: '',
-    organizerId: '',
-    location: '',
-    dateTime: '',
-    posterFile: null,
-    posterUrl: '',
-    coordinates: { lat: '', lng: '' },
-    attendees: []
-  });
-
+  const [isEditing, setIsEditing] = useState(false);
+  const [currentEventId, setCurrentEventId] = useState(null);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
 
@@ -54,19 +36,19 @@ export default function EventManagement() {
 
   // Firestore data subscription
   useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, 'events'), (snapshot) => {
-      const eventsData = snapshot.docs.map(doc => {
+    const unsubscribe = onSnapshot(collection(db, "events"), (snapshot) => {
+      const eventsData = snapshot.docs.map((doc) => {
         const data = doc.data();
         return {
           id: doc.id,
           ...data,
           dateTime: data.dateTime?.toDate(),
-          coordinates: data.coordinates 
-            ? { 
-                lat: data.coordinates.latitude, 
-                lng: data.coordinates.longitude 
-              }
-            : null
+          coordinates: data.coordinates
+            ? new GeoPoint(
+                data.coordinates.latitude,
+                data.coordinates.longitude
+              )
+            : null,
         };
       });
       setEvents(eventsData);
@@ -77,228 +59,222 @@ export default function EventManagement() {
   // Handle file upload
   const uploadFile = async (file) => {
     if (!file) return null;
-  
+
     try {
       setIsUploading(true);
       setUploadProgress(0);
-      
+
       // 1. Create storage reference
-      const storageRef = ref(storage, `event-posters/${Date.now()}-${file.name}`);
-      
+      const storageRef = ref(
+        storage,
+        `event-posters/${Date.now()}-${file.name}`
+      );
+
       // 2. Start upload
       const uploadTask = uploadBytesResumable(storageRef, file);
-      
+
       // 3. Track progress
-      uploadTask.on('state_changed',
+      uploadTask.on(
+        "state_changed",
         (snapshot) => {
-          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+          const progress =
+            (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
           setUploadProgress(Math.round(progress));
         },
         (error) => {
-          console.error('Upload error:', error);
+          console.error("Upload error:", error);
           throw error;
         }
       );
-      
+
       // 4. Wait for upload to complete
       await uploadTask;
-      
+
       // 5. Get download URL
       return await getDownloadURL(uploadTask.snapshot.ref);
-      
     } catch (error) {
-      console.error('Upload failed:', error);
+      console.error("Upload failed:", error);
       throw error;
     } finally {
       setIsUploading(false);
     }
   };
 
-  // Add Event
-  const handleAddEvent = async (e) => {
+  // Handle form submission (both add and edit)
+  const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      let posterUrl = '';
-      
-      // Upload poster if file exists
-      if (newEvent.posterFile) {
-        posterUrl = await uploadFile(newEvent.posterFile);
-      }
+      let posterUrl = formData.posterUrl;
 
-      // Validate coordinates
-      const hasCoordinates = newEvent.coordinates.lat && newEvent.coordinates.lng;
-      const coordinates = hasCoordinates
-        ? new GeoPoint(
-            Number(newEvent.coordinates.lat),
-            Number(newEvent.coordinates.lng)
-          )
-        : null;
+      // Upload poster if file exists
+      if (formData.posterFile) {
+        posterUrl = await uploadFile(formData.posterFile);
+      }
 
       const eventData = {
-        name: newEvent.name,
-        description: newEvent.description,
-        organizerId: auth.currentUser?.uid || '',
-        location: newEvent.location,
-        dateTime: new Date(newEvent.dateTime),
+        name: formData.name,
+        description: formData.description,
+        location: formData.location,
+        dateTime: new Date(formData.dateTime),
         posterUrl,
-        coordinates,
-        attendees: []
       };
 
-      await addDoc(collection(db, 'events'), eventData);
-      
-      // Reset form
-      setNewEvent({ 
-        name: '',
-        description: '',
-        organizerId: '',
-        location: '',
-        dateTime: '',
-        posterFile: null,
-        coordinates: { lat: '', lng: '' },
-        attendees: []
-      });
-      setUploadProgress(0);
-    } catch (error) {
-      console.error('Error adding event:', error);
-      alert(`Error adding event: ${error.message}`);
-    }
-  };
-
-  // Edit Event - Initialize edit mode
-  const handleEditClick = (event) => {
-    setEditingEventId(event.id);
-    setEditedEvent({
-      ...event,
-      dateTime: event.dateTime?.toISOString().slice(0, 16), // Format for datetime-local input
-      coordinates: event.coordinates || { lat: '', lng: '' },
-      posterFile: null,
-      posterUrl: event.posterUrl || ''
-    });
-  };
-
-  // Save Edited Event
-  const handleSaveEdit = async () => {
-    if (!editingEventId) return;
-  
-    try {
-      let posterUrl = editedEvent.posterUrl;
-      
-      // Upload new poster if file exists
-      if (editedEvent.posterFile) {
-        posterUrl = await uploadFile(editedEvent.posterFile);
+      if (formData.coordinates.lat != "" && formData.coordinates.lng != "") {
+        eventData.coordinates = new GeoPoint(
+          parseFloat(formData.coordinates.lat),
+          parseFloat(formData.coordinates.lng)
+        );
       }
-  
-      // Validate all required fields
-      const updateData = {
-        name: editedEvent.name || '', // Fallback to empty string if undefined
-        description: editedEvent.description || '', // Fallback to empty string
-        location: editedEvent.location || '',
-        dateTime: editedEvent.dateTime ? new Date(editedEvent.dateTime) : new Date(),
-        posterUrl: posterUrl || '',
-        coordinates: editedEvent.coordinates || null
-      };
-  
-      // Remove undefined fields
-      Object.keys(updateData).forEach(key => {
-        if (updateData[key] === undefined) {
-          delete updateData[key];
-        }
-      });
-  
-      const eventRef = doc(db, 'events', editingEventId);
-      await updateDoc(eventRef, updateData);
-      
-      setEditingEventId(null);
+
+      if (isEditing && currentEventId) {
+        // Update existing event
+        await updateDoc(doc(db, "events", currentEventId), eventData);
+      } else {
+        // Create new event
+        eventData.organizerId = auth.currentUser?.uid || "";
+        eventData.attendees = [];
+        await addDoc(collection(db, "events"), eventData);
+      }
+
+      // Reset form
+      resetForm();
     } catch (error) {
-      console.error('Error updating event:', error);
-      alert(`Error updating event: ${error.message}`);
+      console.error(`Error ${isEditing ? "updating" : "adding"} event:`, error);
+      alert(
+        `Error ${isEditing ? "updating" : "adding"} event: ${error.message}`
+      );
     }
   };
 
-  // Cancel Editing
-  const handleCancelEdit = () => {
-    setEditingEventId(null);
+  // Initialize edit mode
+  const handleEditClick = (event) => {
+    setIsEditing(true);
+    setCurrentEventId(event.id);
+
+    // Format dateTime for datetime-local input
+    const formattedDateTime = event.dateTime
+      ? new Date(event.dateTime).toISOString().slice(0, 16)
+      : "";
+
+    // Set form data with event details
+    setFormData({
+      name: event.name || "",
+      description: event.description || "",
+      location: event.location || "",
+      dateTime: formattedDateTime,
+      posterFile: null,
+      posterUrl: event.posterUrl || "",
+      coordinates: {
+        lat: event.coordinates?.latitude || "",
+        lng: event.coordinates?.longitude || "",
+      },
+      attendees: event.attendees || [],
+    });
+
+    // Scroll to form
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  // Reset form and exit edit mode
+  const resetForm = () => {
+    setFormData({
+      name: "",
+      description: "",
+      organizerId: "",
+      location: "",
+      dateTime: "",
+      posterFile: null,
+      posterUrl: "",
+      coordinates: { lat: "", lng: "" },
+      attendees: [],
+    });
+    setIsEditing(false);
+    setCurrentEventId(null);
+    setUploadProgress(0);
   };
 
   // Delete Event
   const handleDeleteEvent = async (eventId) => {
-    try {
-      await deleteDoc(doc(db, 'events', eventId));
-    } catch (error) {
-      alert('Error deleting event: ' + error.message);
-    }
-  };
+    if (window.confirm("Are you sure you want to delete this event?")) {
+      try {
+        await deleteDoc(doc(db, "events", eventId));
 
-  // Toggle Attendance
-  const handleToggleAttendance = async (eventId, currentAttendees) => {
-    const userId = auth.currentUser?.uid;
-    if (!userId) return;
-
-    try {
-      const eventRef = doc(db, 'events', eventId);
-      const isAttending = currentAttendees.includes(userId);
-
-      if (isAttending) {
-        await updateDoc(eventRef, {
-          attendees: arrayRemove(userId)
-        });
-      } else {
-        await updateDoc(eventRef, {
-          attendees: arrayUnion(userId)
-        });
+        // If deleting the event that's being edited, reset the form
+        if (currentEventId === eventId) {
+          resetForm();
+        }
+      } catch (error) {
+        alert("Error deleting event: " + error.message);
       }
-    } catch (error) {
-      alert('Error updating attendance: ' + error.message);
     }
   };
 
   return (
     <div>
-      <h1 className="text-3xl font-bold text-college-primary mb-6">Event Management</h1>
+      <h1 className="text-3xl font-bold text-college-primary mb-6">
+        Event Management
+      </h1>
 
-      {/* Add Event Form */}
+      {/* Event Form */}
       <div className="bg-white p-6 rounded-lg shadow-sm mb-8">
-        <h2 className="text-xl font-semibold mb-4">Create New Event</h2>
-        <form onSubmit={handleAddEvent} className="grid grid-cols-2 gap-4">
+        <h2 className="text-xl font-semibold mb-4">
+          {isEditing ? "Edit Event" : "Create New Event"}
+        </h2>
+        <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-4">
           <input
             type="text"
             placeholder="Event Name"
             className="p-2 border rounded"
-            value={newEvent.name}
-            onChange={(e) => setNewEvent({ ...newEvent, name: e.target.value })}
+            value={formData.name}
+            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
             required
           />
           <input
             type="datetime-local"
             className="p-2 border rounded"
-            value={newEvent.dateTime}
-            onChange={(e) => setNewEvent({ ...newEvent, dateTime: e.target.value })}
+            value={formData.dateTime}
+            onChange={(e) =>
+              setFormData({ ...formData, dateTime: e.target.value })
+            }
             required
           />
           <input
             type="text"
             placeholder="Location"
             className="p-2 border rounded"
-            value={newEvent.location}
-            onChange={(e) => setNewEvent({ ...newEvent, location: e.target.value })}
+            value={formData.location}
+            onChange={(e) =>
+              setFormData({ ...formData, location: e.target.value })
+            }
             required
           />
           <div className="col-span-2">
             <label className="block mb-1">Event Poster:</label>
+            {formData.posterUrl && (
+              <div className="mb-2">
+                <img
+                  src={formData.posterUrl}
+                  alt="Current poster"
+                  className="h-20 object-cover mb-2"
+                />
+                <p className="text-sm text-gray-500">Current poster</p>
+              </div>
+            )}
             <input
               type="file"
               accept="image/*"
               className="p-2 border rounded w-full"
-              onChange={(e) => setNewEvent({ 
-                ...newEvent, 
-                posterFile: e.target.files[0] 
-              })}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  posterFile: e.target.files[0],
+                })
+              }
             />
             {isUploading && (
               <div className="w-full bg-gray-200 rounded-full h-2.5 mt-2">
-                <div 
-                  className="bg-college-primary h-2.5 rounded-full" 
+                <div
+                  className="bg-college-primary h-2.5 rounded-full"
                   style={{ width: `${uploadProgress}%` }}
                 ></div>
               </div>
@@ -309,22 +285,26 @@ export default function EventManagement() {
               type="number"
               placeholder="Latitude"
               className="p-2 border rounded"
-              value={newEvent.coordinates.lat}
-              onChange={(e) => setNewEvent({ 
-                ...newEvent, 
-                coordinates: { ...newEvent.coordinates, lat: e.target.value } 
-              })}
+              value={formData.coordinates.lat}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  coordinates: { ...formData.coordinates, lat: e.target.value },
+                })
+              }
               step="any"
             />
             <input
               type="number"
               placeholder="Longitude"
               className="p-2 border rounded"
-              value={newEvent.coordinates.lng}
-              onChange={(e) => setNewEvent({ 
-                ...newEvent, 
-                coordinates: { ...newEvent.coordinates, lng: e.target.value } 
-              })}
+              value={formData.coordinates.lng}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  coordinates: { ...formData.coordinates, lng: e.target.value },
+                })
+              }
               step="any"
             />
           </div>
@@ -332,16 +312,33 @@ export default function EventManagement() {
             placeholder="Description"
             className="p-2 border rounded col-span-2"
             rows="3"
-            value={newEvent.description}
-            onChange={(e) => setNewEvent({ ...newEvent, description: e.target.value })}
+            value={formData.description}
+            onChange={(e) =>
+              setFormData({ ...formData, description: e.target.value })
+            }
           />
-          <button
-            type="submit"
-            className="col-span-2 bg-college-primary text-white py-2 px-4 rounded hover:bg-blue-900"
-            disabled={isUploading}
-          >
-            {isUploading ? 'Uploading...' : 'Create Event'}
-          </button>
+          <div className="col-span-2 flex space-x-4">
+            <button
+              type="submit"
+              className="bg-college-primary text-white py-2 px-4 rounded hover:bg-blue-900 flex-grow"
+              disabled={isUploading}
+            >
+              {isUploading
+                ? "Uploading..."
+                : isEditing
+                ? "Save Event"
+                : "Create Event"}
+            </button>
+            {isEditing && (
+              <button
+                type="button"
+                onClick={resetForm}
+                className="bg-gray-500 text-white py-2 px-4 rounded hover:bg-gray-600"
+              >
+                Cancel
+              </button>
+            )}
+          </div>
         </form>
       </div>
 
@@ -361,120 +358,36 @@ export default function EventManagement() {
           <tbody>
             {events.map((event) => (
               <tr key={event.id} className="border-b">
+                <td className="px-6 py-4">{event.name}</td>
                 <td className="px-6 py-4">
-                  {editingEventId === event.id ? (
-                    <input
-                      type="text"
-                      value={editedEvent.name}
-                      onChange={(e) => setEditedEvent({...editedEvent, name: e.target.value})}
-                      className="p-1 border rounded w-full"
-                      required
+                  {event.dateTime?.toLocaleString()}
+                </td>
+                <td className="px-6 py-4">{event.location}</td>
+                <td className="px-6 py-4">
+                  {event.posterUrl ? (
+                    <img
+                      src={event.posterUrl}
+                      alt="Event poster"
+                      className="h-10 w-10 object-cover"
                     />
                   ) : (
-                    event.name
+                    "No poster"
                   )}
                 </td>
-                <td className="px-6 py-4">
-                  {editingEventId === event.id ? (
-                    <input
-                      type="datetime-local"
-                      value={editedEvent.dateTime}
-                      onChange={(e) => setEditedEvent({...editedEvent, dateTime: e.target.value})}
-                      className="p-1 border rounded"
-                      required
-                    />
-                  ) : (
-                    event.dateTime?.toLocaleString()
-                  )}
-                </td>
-                <td className="px-6 py-4">
-                  {editingEventId === event.id ? (
-                    <input
-                      type="text"
-                      value={editedEvent.location}
-                      onChange={(e) => setEditedEvent({...editedEvent, location: e.target.value})}
-                      className="p-1 border rounded w-full"
-                      required
-                    />
-                  ) : (
-                    event.location
-                  )}
-                </td>
-                <td className="px-6 py-4">
-                  {editingEventId === event.id ? (
-                    <div>
-                      {editedEvent.posterUrl && (
-                        <img 
-                          src={editedEvent.posterUrl} 
-                          alt="Current poster" 
-                          className="h-10 w-10 object-cover mb-2"
-                        />
-                      )}
-                      <input
-                        type="file"
-                        accept="image/*"
-                        className="p-1 border rounded text-xs"
-                        onChange={(e) => setEditedEvent({
-                          ...editedEvent,
-                          posterFile: e.target.files[0]
-                        })}
-                      />
-                    </div>
-                  ) : (
-                    event.posterUrl ? (
-                      <img src={event.posterUrl} alt="Event poster" className="h-10 w-10 object-cover" />
-                    ) : (
-                      'No poster'
-                    )
-                  )}
-                </td>
-                <td className="px-6 py-4">
-                  {event.attendees?.length || 0}
-                  {auth.currentUser && (
-                    <button
-                      onClick={() => handleToggleAttendance(event.id, event.attendees || [])}
-                      className={`ml-2 px-2 py-1 rounded text-xs ${
-                        event.attendees?.includes(auth.currentUser.uid) 
-                          ? 'bg-red-100 text-red-800' 
-                          : 'bg-green-100 text-green-800'
-                      }`}
-                    >
-                      {event.attendees?.includes(auth.currentUser.uid) ? 'Leave' : 'Join'}
-                    </button>
-                  )}
-                </td>
+                <td className="px-6 py-4">{event.attendees?.length || 0}</td>
                 <td className="px-6 py-4 space-x-2">
-                  {editingEventId === event.id ? (
-                    <>
-                      <button
-                        onClick={handleSaveEdit}
-                        className="text-green-600 hover:text-green-800"
-                      >
-                        Save
-                      </button>
-                      <button
-                        onClick={handleCancelEdit}
-                        className="text-gray-600 hover:text-gray-800"
-                      >
-                        Cancel
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <button
-                        onClick={() => handleEditClick(event)}
-                        className="text-blue-600 hover:text-blue-800"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => handleDeleteEvent(event.id)}
-                        className="text-red-600 hover:text-red-800"
-                      >
-                        Delete
-                      </button>
-                    </>
-                  )}
+                  <button
+                    onClick={() => handleEditClick(event)}
+                    className="text-blue-600 hover:text-blue-800"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => handleDeleteEvent(event.id)}
+                    className="text-red-600 hover:text-red-800"
+                  >
+                    Delete
+                  </button>
                 </td>
               </tr>
             ))}

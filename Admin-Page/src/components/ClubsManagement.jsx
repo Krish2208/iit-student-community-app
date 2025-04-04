@@ -1,43 +1,46 @@
-import { useState, useEffect } from 'react';
-import { db, storage } from '../firebase';
-import { collection, addDoc, onSnapshot, updateDoc, deleteDoc, doc, arrayUnion, arrayRemove } from 'firebase/firestore';
-import { getAuth } from 'firebase/auth';
-import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
+import { useState, useEffect } from "react";
+import { db, storage } from "../firebase";
+import {
+  collection,
+  addDoc,
+  onSnapshot,
+  updateDoc,
+  deleteDoc,
+  doc,
+  arrayUnion,
+  arrayRemove,
+} from "firebase/firestore";
+import { getAuth } from "firebase/auth";
+import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 
 export default function ClubsManagement() {
   const [clubs, setClubs] = useState([]);
-  const [newClub, setNewClub] = useState({
-    name: '',
-    description: '',
-    photoUrl: '',
-    bannerUrl: '',
-    subscribers: [],
+  // Add to formData state initialization
+  const [formData, setFormData] = useState({
+    name: "",
+    description: "",
+    photoUrl: "",
+    bannerUrl: "",
     photoFile: null,
-    bannerFile: null
+    bannerFile: null,
+    removePhoto: false, // Add this line
+    removeBanner: false, // Add this line
   });
 
-  const [editingClubId, setEditingClubId] = useState(null);
-  const [editedClub, setEditedClub] = useState({
-    name: '',
-    description: '',
-    photoUrl: '',
-    bannerUrl: '',
-    subscribers: [],
-    photoFile: null,
-    bannerFile: null
-  });
-
+  const [isEditing, setIsEditing] = useState(false);
+  const [currentClubId, setCurrentClubId] = useState(null);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
   const auth = getAuth();
 
   // Firestore data subscription
   useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, 'clubs'), (snapshot) => {
-      const clubsData = snapshot.docs.map(doc => ({
+    const unsubscribe = onSnapshot(collection(db, "clubs"), (snapshot) => {
+      const clubsData = snapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
-        isSubscribed: doc.data().subscribers?.includes(auth.currentUser?.uid) || false
+        isSubscribed:
+          doc.data().subscribers?.includes(auth.currentUser?.uid) || false,
       }));
       setClubs(clubsData);
     });
@@ -47,216 +50,258 @@ export default function ClubsManagement() {
   // Handle file upload
   const uploadFile = async (file, path) => {
     if (!file) return null;
-    
+
     try {
       setIsUploading(true);
       setUploadProgress(0);
-      
+
       const storageRef = ref(storage, `${path}/${Date.now()}-${file.name}`);
       const uploadTask = uploadBytesResumable(storageRef, file);
-      
-      uploadTask.on('state_changed',
+
+      uploadTask.on(
+        "state_changed",
         (snapshot) => {
-          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+          const progress =
+            (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
           setUploadProgress(Math.round(progress));
         },
         (error) => {
-          console.error('Upload error:', error);
+          console.error("Upload error:", error);
           throw error;
         }
       );
-      
+
       await uploadTask;
       return await getDownloadURL(uploadTask.snapshot.ref);
     } catch (error) {
-      console.error('Upload failed:', error);
+      console.error("Upload failed:", error);
       throw error;
     } finally {
       setIsUploading(false);
     }
   };
 
-  // Add Club
-  const handleAddClub = async (e) => {
+  // Handle form submission (both add and edit)
+  const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      let photoUrl = '';
-      let bannerUrl = '';
-      
+      let photoUrl = formData.photoUrl;
+      let bannerUrl = formData.bannerUrl;
+
       // Upload photo if file exists
-      if (newClub.photoFile) {
-        photoUrl = await uploadFile(newClub.photoFile, 'club-photos');
+      if (formData.photoFile) {
+        photoUrl = await uploadFile(formData.photoFile, "club-photos");
+      } else if (formData.removePhoto) {
+        photoUrl = ""; // Clear the photo URL if removal flag is set
       }
 
       // Upload banner if file exists
-      if (newClub.bannerFile) {
-        bannerUrl = await uploadFile(newClub.bannerFile, 'club-banners');
+      if (formData.bannerFile) {
+        bannerUrl = await uploadFile(formData.bannerFile, "club-banners");
+      } else if (formData.removeBanner) {
+        bannerUrl = ""; // Clear the banner URL if removal flag is set
       }
 
       const clubData = {
-        name: newClub.name.trim(),
-        description: newClub.description.trim(),
-        photoUrl: photoUrl || newClub.photoUrl,
-        bannerUrl: bannerUrl || newClub.bannerUrl,
-        subscribers: []
-      };
-
-      await addDoc(collection(db, 'clubs'), clubData);
-      
-      // Reset form
-      setNewClub({ 
-        name: '',
-        description: '',
-        photoUrl: '',
-        bannerUrl: '',
-        subscribers: [],
-        photoFile: null,
-        bannerFile: null
-      });
-      setUploadProgress(0);
-    } catch (error) {
-      alert(`Error adding club: ${error.message}`);
-    }
-  };
-
-  // Edit Club - Initialize edit mode
-  const handleEditClick = (club) => {
-    setEditingClubId(club.id);
-    setEditedClub({
-      ...club,
-      photoFile: null,
-      bannerFile: null
-    });
-  };
-
-  // Save Edited Club
-  const handleSaveEdit = async () => {
-    if (!editingClubId) return;
-
-    try {
-      let photoUrl = editedClub.photoUrl;
-      let bannerUrl = editedClub.bannerUrl;
-      
-      // Upload new photo if file exists
-      if (editedClub.photoFile) {
-        photoUrl = await uploadFile(editedClub.photoFile, 'club-photos');
-      }
-
-      // Upload new banner if file exists
-      if (editedClub.bannerFile) {
-        bannerUrl = await uploadFile(editedClub.bannerFile, 'club-banners');
-      }
-
-      const updateData = {
-        name: editedClub.name.trim(),
-        description: editedClub.description.trim(),
+        name: formData.name.trim(),
+        description: formData.description.trim(),
         photoUrl,
-        bannerUrl
+        bannerUrl,
       };
 
-      const clubRef = doc(db, 'clubs', editingClubId);
-      await updateDoc(clubRef, updateData);
-      setEditingClubId(null);
+      if (isEditing && currentClubId) {
+        // Update existing club
+        await updateDoc(doc(db, "clubs", currentClubId), clubData);
+      } else {
+        // Create new club
+        clubData.subscribers = [];
+        await addDoc(collection(db, "clubs"), clubData);
+      }
+
+      // Reset form
+      resetForm();
     } catch (error) {
-      alert(`Error updating club: ${error.message}`);
+      alert(
+        `Error ${isEditing ? "updating" : "adding"} club: ${error.message}`
+      );
     }
   };
 
-  // Cancel Editing
-  const handleCancelEdit = () => {
-    setEditingClubId(null);
+  // Initialize edit mode
+  const handleEditClick = (club) => {
+    setIsEditing(true);
+    setCurrentClubId(club.id);
+
+    // Set form data with club details
+    setFormData({
+      name: club.name || "",
+      description: club.description || "",
+      photoUrl: club.photoUrl || "",
+      bannerUrl: club.bannerUrl || "",
+      photoFile: null,
+      bannerFile: null,
+      removePhoto: false,
+      removeBanner: false,
+    });
+
+    // Scroll to form
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  // Reset form and exit edit mode
+  const resetForm = () => {
+    setFormData({
+      name: "",
+      description: "",
+      photoUrl: "",
+      bannerUrl: "",
+      photoFile: null,
+      bannerFile: null,
+      removePhoto: false,
+      removeBanner: false,
+    });
+    setIsEditing(false);
+    setCurrentClubId(null);
+    setUploadProgress(0);
   };
 
   // Delete Club
   const handleDeleteClub = async (clubId) => {
-    if (window.confirm('Are you sure you want to delete this club?')) {
+    if (window.confirm("Are you sure you want to delete this club?")) {
       try {
-        await deleteDoc(doc(db, 'clubs', clubId));
+        await deleteDoc(doc(db, "clubs", clubId));
+
+        // If deleting the club that's being edited, reset the form
+        if (currentClubId === clubId) {
+          resetForm();
+        }
       } catch (error) {
         alert(`Error deleting club: ${error.message}`);
       }
     }
   };
 
-  // Toggle Subscription
-  const handleToggleSubscription = async (clubId, currentSubscribers) => {
-    const userId = auth.currentUser?.uid;
-    if (!userId) return;
-
-    try {
-      const clubRef = doc(db, 'clubs', clubId);
-      const isSubscribed = currentSubscribers.includes(userId);
-
-      if (isSubscribed) {
-        await updateDoc(clubRef, {
-          subscribers: arrayRemove(userId)
-        });
-      } else {
-        await updateDoc(clubRef, {
-          subscribers: arrayUnion(userId)
-        });
-      }
-    } catch (error) {
-      alert(`Error updating subscription: ${error.message}`);
-    }
-  };
-
   return (
     <div>
-      <h1 className="text-3xl font-bold text-college-primary mb-6">Clubs Management</h1>
+      <h1 className="text-3xl font-bold text-college-primary mb-6">
+        Clubs Management
+      </h1>
 
-      {/* Add Club Form */}
+      {/* Club Form */}
       <div className="bg-white p-6 rounded-lg shadow-sm mb-8">
-        <h2 className="text-xl font-semibold mb-4">Register New Club</h2>
-        <form onSubmit={handleAddClub} className="grid grid-cols-2 gap-4">
-          <input
-            type="text"
-            placeholder="Club Name"
-            className="p-2 border rounded"
-            value={newClub.name}
-            onChange={(e) => setNewClub({ ...newClub, name: e.target.value })}
-            required
-          />
-          
-          <div>
-            <label className="block mb-1">Club Photo:</label>
+        <h2 className="text-xl font-semibold mb-4">
+          {isEditing ? "Edit Club" : "Register New Club"}
+        </h2>
+        <form
+          onSubmit={handleSubmit}
+          className="grid grid-cols-1 md:grid-cols-2 gap-4"
+        >
+          <div className="md:col-span-2">
+            <label className="block mb-1 font-medium">Club Name:</label>
             <input
-              type="file"
-              accept="image/*"
+              type="text"
+              placeholder="Club Name"
               className="p-2 border rounded w-full"
-              onChange={(e) => setNewClub({ ...newClub, photoFile: e.target.files[0] })}
+              value={formData.name}
+              onChange={(e) =>
+                setFormData({ ...formData, name: e.target.value })
+              }
+              required
             />
-            {newClub.photoUrl && !newClub.photoFile && (
-              <p className="text-sm mt-1">Current: {newClub.photoUrl}</p>
-            )}
           </div>
 
-          <textarea
-            placeholder="Description"
-            className="p-2 border rounded col-span-2"
-            rows="3"
-            value={newClub.description}
-            onChange={(e) => setNewClub({ ...newClub, description: e.target.value })}
-          />
+          <div className="md:col-span-2">
+            <label className="block mb-1 font-medium">Description:</label>
+            <textarea
+              placeholder="Description"
+              className="p-2 border rounded w-full"
+              rows="3"
+              value={formData.description}
+              onChange={(e) =>
+                setFormData({ ...formData, description: e.target.value })
+              }
+            />
+          </div>
 
           <div>
-            <label className="block mb-1">Banner Image:</label>
+            <label className="block mb-1 font-medium">Club Photo:</label>
+            {formData.photoUrl && (
+              <div className="mb-2">
+                <div className="flex items-center justify-between">
+                  <img
+                    src={formData.photoUrl}
+                    alt="Current photo"
+                    className="h-16 w-16 object-cover rounded-full mb-2"
+                  />
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setFormData({
+                        ...formData,
+                        photoUrl: "",
+                        removePhoto: true,
+                      })
+                    }
+                    className="text-red-600 hover:text-red-800 ml-2"
+                  >
+                    Remove
+                  </button>
+                </div>
+                <p className="text-sm text-gray-500">Current photo</p>
+              </div>
+            )}
             <input
               type="file"
               accept="image/*"
               className="p-2 border rounded w-full"
-              onChange={(e) => setNewClub({ ...newClub, bannerFile: e.target.files[0] })}
+              onChange={(e) =>
+                setFormData({ ...formData, photoFile: e.target.files[0] })
+              }
             />
-            {newClub.bannerUrl && !newClub.bannerFile && (
-              <p className="text-sm mt-1">Current: {newClub.bannerUrl}</p>
+          </div>
+
+          <div>
+            <label className="block mb-1 font-medium">Banner Image:</label>
+            {formData.bannerUrl && (
+              <div className="mb-2">
+                <div className="flex items-center justify-between">
+                  <img
+                    src={formData.bannerUrl}
+                    alt="Current banner"
+                    className="h-16 w-full object-cover mb-2"
+                  />
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setFormData({
+                        ...formData,
+                        bannerUrl: "",
+                        removeBanner: true,
+                      })
+                    }
+                    className="text-red-600 hover:text-red-800 ml-2"
+                  >
+                    Remove
+                  </button>
+                </div>
+                <p className="text-sm text-gray-500">Current banner</p>
+              </div>
             )}
+            <input
+              type="file"
+              accept="image/*"
+              className="p-2 border rounded w-full"
+              onChange={(e) =>
+                setFormData({ ...formData, bannerFile: e.target.files[0] })
+              }
+            />
           </div>
 
           {isUploading && (
-            <div className="col-span-2">
+            <div className="md:col-span-2">
               <div className="w-full bg-gray-200 rounded-full h-2.5">
-                <div 
-                  className="bg-college-primary h-2.5 rounded-full" 
+                <div
+                  className="bg-college-primary h-2.5 rounded-full"
                   style={{ width: `${uploadProgress}%` }}
                 ></div>
               </div>
@@ -264,13 +309,28 @@ export default function ClubsManagement() {
             </div>
           )}
 
-          <button
-            type="submit"
-            className="col-span-2 bg-college-primary text-white py-2 px-4 rounded hover:bg-blue-900 disabled:opacity-50"
-            disabled={isUploading}
-          >
-            {isUploading ? 'Uploading...' : 'Register Club'}
-          </button>
+          <div className="md:col-span-2 flex space-x-4">
+            <button
+              type="submit"
+              className="bg-college-primary text-white py-2 px-4 rounded hover:bg-blue-900 flex-grow disabled:opacity-50"
+              disabled={isUploading}
+            >
+              {isUploading
+                ? "Uploading..."
+                : isEditing
+                ? "Save Club"
+                : "Register Club"}
+            </button>
+            {isEditing && (
+              <button
+                type="button"
+                onClick={resetForm}
+                className="bg-gray-500 text-white py-2 px-4 rounded hover:bg-gray-600"
+              >
+                Cancel
+              </button>
+            )}
+          </div>
         </form>
       </div>
 
@@ -288,117 +348,48 @@ export default function ClubsManagement() {
             </tr>
           </thead>
           <tbody>
-            {clubs.map(club => (
+            {clubs.map((club) => (
               <tr key={club.id} className="border-b">
+                <td className="px-6 py-4">{club.name}</td>
                 <td className="px-6 py-4">
-                  {editingClubId === club.id ? (
-                    <input
-                      type="text"
-                      value={editedClub.name}
-                      onChange={(e) => setEditedClub({...editedClub, name: e.target.value})}
-                      className="p-1 border rounded w-full"
-                      required
+                  {club.description || "No description"}
+                </td>
+                <td className="px-6 py-4">
+                  {club.photoUrl ? (
+                    <img
+                      src={club.photoUrl}
+                      alt="Club"
+                      className="h-10 w-10 rounded-full object-cover"
                     />
                   ) : (
-                    club.name
+                    "No photo"
                   )}
                 </td>
                 <td className="px-6 py-4">
-                  {editingClubId === club.id ? (
-                    <textarea
-                      value={editedClub.description}
-                      onChange={(e) => setEditedClub({...editedClub, description: e.target.value})}
-                      className="p-1 border rounded w-full"
+                  {club.bannerUrl ? (
+                    <img
+                      src={club.bannerUrl}
+                      alt="Banner"
+                      className="h-10 w-20 object-cover"
                     />
                   ) : (
-                    club.description || 'No description'
+                    "No banner"
                   )}
                 </td>
-                <td className="px-6 py-4">
-                  {editingClubId === club.id ? (
-                    <div>
-                      {editedClub.photoUrl && !editedClub.photoFile && (
-                        <img src={editedClub.photoUrl} alt="Current" className="h-10 w-10 rounded-full mb-2" />
-                      )}
-                      <input
-                        type="file"
-                        accept="image/*"
-                        className="p-1 border rounded text-xs"
-                        onChange={(e) => setEditedClub({...editedClub, photoFile: e.target.files[0]})}
-                      />
-                    </div>
-                  ) : (
-                    club.photoUrl ? (
-                      <img src={club.photoUrl} alt="Club" className="h-10 w-10 rounded-full object-cover" />
-                    ) : (
-                      'No photo'
-                    )
-                  )}
-                </td>
-                <td className="px-6 py-4">
-                  {editingClubId === club.id ? (
-                    <div>
-                      {editedClub.bannerUrl && !editedClub.bannerFile && (
-                        <img src={editedClub.bannerUrl} alt="Current" className="h-10 w-20 mb-2" />
-                      )}
-                      <input
-                        type="file"
-                        accept="image/*"
-                        className="p-1 border rounded text-xs"
-                        onChange={(e) => setEditedClub({...editedClub, bannerFile: e.target.files[0]})}
-                      />
-                    </div>
-                  ) : (
-                    club.bannerUrl ? (
-                      <img src={club.bannerUrl} alt="Banner" className="h-10 w-20 object-cover" />
-                    ) : (
-                      'No banner'
-                    )
-                  )}
-                </td>
-                <td className="px-6 py-4">
-                  {club.subscribers?.length || 0}
-                  {auth.currentUser && (
-                    <button
-                      onClick={() => handleToggleSubscription(club.id, club.subscribers || [])}
-                      className={`ml-2 px-2 py-1 rounded text-xs ${club.isSubscribed ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}`}
-                    >
-                      {club.isSubscribed ? 'Unsubscribe' : 'Subscribe'}
-                    </button>
-                  )}
-                </td>
+                <td className="px-6 py-4">{club.subscribers?.length || 0}</td>
                 <td className="px-6 py-4 space-x-2">
-                  {editingClubId === club.id ? (
-                    <>
-                      <button 
-                        onClick={handleSaveEdit}
-                        className="text-green-600 hover:text-green-800"
-                      >
-                        Save
-                      </button>
-                      <button 
-                        onClick={handleCancelEdit}
-                        className="text-gray-600 hover:text-gray-800"
-                      >
-                        Cancel
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <button 
-                        onClick={() => handleEditClick(club)}
-                        className="text-blue-600 hover:text-blue-800"
-                      >
-                        Edit
-                      </button>
-                      <button 
-                        onClick={() => handleDeleteClub(club.id)}
-                        className="text-red-600 hover:text-red-800"
-                      >
-                        Delete
-                      </button>
-                    </>
-                  )}
+                  <button
+                    onClick={() => handleEditClick(club)}
+                    className="text-blue-600 hover:text-blue-800"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => handleDeleteClub(club.id)}
+                    className="text-red-600 hover:text-red-800"
+                  >
+                    Delete
+                  </button>
                 </td>
               </tr>
             ))}

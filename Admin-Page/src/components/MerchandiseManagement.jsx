@@ -1,53 +1,49 @@
-import { useState, useEffect } from 'react';
-import { db, storage } from '../firebase';
-import { collection, addDoc, onSnapshot, updateDoc, deleteDoc, doc } from 'firebase/firestore';
-import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
+import { useState, useEffect } from "react";
+import { db, storage } from "../firebase";
+import {
+  collection,
+  addDoc,
+  onSnapshot,
+  updateDoc,
+  deleteDoc,
+  doc,
+} from "firebase/firestore";
+import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 
 export default function MerchandiseManagement() {
   const [products, setProducts] = useState([]);
-  const [newProduct, setNewProduct] = useState({
-    name: '',
-    type: '',
-    sizesAvailable: '',
-    lastDateToPurchase: '',
-    description: '',
-    colorsAvailable: '',
-    images: '',
-    clubId: '',
-    clubName: '',
-    customizationFields: '',
-    price: '',
-    imageFiles: []
+  const [formData, setFormData] = useState({
+    name: "",
+    type: "",
+    sizesAvailable: "",
+    lastDateToPurchase: "",
+    description: "",
+    colorsAvailable: "",
+    images: "",
+    clubId: "",
+    clubName: "",
+    customizationFields: "",
+    price: "",
+    imageFiles: [],
   });
 
-  const [editingProductId, setEditingProductId] = useState(null);
-  const [editedProduct, setEditedProduct] = useState({
-    name: '',
-    type: '',
-    sizesAvailable: '',
-    lastDateToPurchase: '',
-    description: '',
-    colorsAvailable: '',
-    images: '',
-    clubId: '',
-    clubName: '',
-    customizationFields: '',
-    price: '',
-    imageFiles: []
-  });
-
+  const [isEditing, setIsEditing] = useState(false);
+  const [currentProductId, setCurrentProductId] = useState(null);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
 
   useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, 'merchandise'), (snapshot) => {
-      const productsData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        lastDateToPurchase: doc.data().lastDateToPurchase?.toDate()
-      }));
-      setProducts(productsData);
-    });
+    const unsubscribe = onSnapshot(
+      collection(db, "merchandise"),
+      (snapshot) => {
+        const productsData = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+          lastDateToPurchase: doc.data().lastDateToPurchase?.toDate(),
+        }));
+        setProducts(productsData);
+      }
+    );
     return () => unsubscribe();
   }, []);
 
@@ -59,13 +55,15 @@ export default function MerchandiseManagement() {
       const storageRef = ref(storage, `merchandise/${Date.now()}-${file.name}`);
       const uploadTask = uploadBytesResumable(storageRef, file);
 
-      uploadTask.on('state_changed',
+      uploadTask.on(
+        "state_changed",
         (snapshot) => {
-          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+          const progress =
+            (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
           setUploadProgress(Math.round(progress));
         },
         (error) => {
-          console.error('Upload error:', error);
+          console.error("Upload error:", error);
           throw error;
         }
       );
@@ -73,245 +71,406 @@ export default function MerchandiseManagement() {
       await uploadTask;
       return await getDownloadURL(uploadTask.snapshot.ref);
     } catch (error) {
-      console.error('Upload failed:', error);
+      console.error("Upload failed:", error);
       throw error;
     } finally {
       setIsUploading(false);
     }
   };
 
-  const handleAddProduct = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     try {
       let imageUrls = [];
-      if (newProduct.imageFiles.length > 0) {
+      if (formData.imageFiles.length > 0) {
         imageUrls = await Promise.all(
-          newProduct.imageFiles.map(file => uploadFile(file))
+          formData.imageFiles.map((file) => uploadFile(file))
         );
       }
 
-      const existingUrls = newProduct.images.split(',').map(i => i.trim()).filter(i => i);
+      const existingUrls = formData.images
+        .split(",")
+        .map((i) => i.trim())
+        .filter((i) => i);
       const allImages = [...existingUrls, ...imageUrls];
 
       const productData = {
-        name: newProduct.name.trim(),
-        type: newProduct.type.trim(),
-        sizesAvailable: newProduct.sizesAvailable.split(',').map(s => s.trim()).filter(s => s),
-        lastDateToPurchase: newProduct.lastDateToPurchase ? new Date(newProduct.lastDateToPurchase) : new Date(),
-        description: newProduct.description.trim(),
-        colorsAvailable: newProduct.colorsAvailable.split(',').map(c => c.trim()).filter(c => c),
+        name: formData.name.trim(),
+        type: formData.type.trim(),
+        sizesAvailable: formData.sizesAvailable
+          .split(",")
+          .map((s) => s.trim())
+          .filter((s) => s),
+        lastDateToPurchase: formData.lastDateToPurchase
+          ? new Date(formData.lastDateToPurchase)
+          : new Date(),
+        description: formData.description.trim(),
+        colorsAvailable: formData.colorsAvailable
+          .split(",")
+          .map((c) => c.trim())
+          .filter((c) => c),
         images: allImages,
-        clubId: newProduct.clubId.trim(),
-        clubName: newProduct.clubName.trim(),
-        customizationFields: Math.max(0, parseInt(newProduct.customizationFields)) || 0,
-        price: Math.max(0, parseFloat(newProduct.price)) || 0
+        clubId: formData.clubId.trim(),
+        clubName: formData.clubName.trim(),
+        customizationFields:
+          Math.max(0, parseInt(formData.customizationFields)) || 0,
+        price: Math.max(0, parseFloat(formData.price)) || 0,
       };
 
-      await addDoc(collection(db, 'merchandise'), productData);
+      if (isEditing && currentProductId) {
+        // Update existing product
+        const productRef = doc(db, "merchandise", currentProductId);
+        await updateDoc(productRef, productData);
+      } else {
+        // Add new product
+        await addDoc(collection(db, "merchandise"), productData);
+      }
 
-      setNewProduct({
-        name: '',
-        type: '',
-        sizesAvailable: '',
-        lastDateToPurchase: '',
-        description: '',
-        colorsAvailable: '',
-        images: '',
-        clubId: '',
-        clubName: '',
-        customizationFields: '',
-        price: '',
-        imageFiles: []
-      });
+      // Reset form
+      resetForm();
     } catch (error) {
-      alert(`Error adding product: ${error.message}`);
+      alert(
+        `Error ${isEditing ? "updating" : "adding"} product: ${error.message}`
+      );
     }
   };
 
   const handleEditClick = (product) => {
-    setEditingProductId(product.id);
-    setEditedProduct({
-      ...product,
-      lastDateToPurchase: product.lastDateToPurchase?.toISOString().split('T')[0] || '',
-      sizesAvailable: product.sizesAvailable?.join(', ') || '',
-      colorsAvailable: product.colorsAvailable?.join(', ') || '',
-      images: product.images?.join(', ') || '',
-      imageFiles: []
+    setIsEditing(true);
+    setCurrentProductId(product.id);
+
+    // Format the date for date input
+    const formattedDate = product.lastDateToPurchase
+      ? product.lastDateToPurchase.toISOString().split("T")[0]
+      : "";
+
+    // Set form data with product details
+    setFormData({
+      name: product.name || "",
+      type: product.type || "",
+      sizesAvailable: product.sizesAvailable?.join(", ") || "",
+      lastDateToPurchase: formattedDate,
+      description: product.description || "",
+      colorsAvailable: product.colorsAvailable?.join(", ") || "",
+      images: product.images?.join(", ") || "",
+      clubId: product.clubId || "",
+      clubName: product.clubName || "",
+      customizationFields: product.customizationFields || "",
+      price: product.price || "",
+      imageFiles: [],
     });
+
+    // Scroll to form
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const handleSaveEdit = async () => {
-    if (!editingProductId) return;
-
-    try {
-      let newImageUrls = [];
-      if (editedProduct.imageFiles.length > 0) {
-        newImageUrls = await Promise.all(
-          editedProduct.imageFiles.map(file => uploadFile(file))
-        );
-      }
-
-      const existingUrls = editedProduct.images.split(',').map(i => i.trim()).filter(i => i);
-      const allImages = [...existingUrls, ...newImageUrls];
-
-      const updateData = {
-        name: editedProduct.name.trim(),
-        type: editedProduct.type.trim(),
-        sizesAvailable: editedProduct.sizesAvailable.split(',').map(s => s.trim()).filter(s => s),
-        lastDateToPurchase: new Date(editedProduct.lastDateToPurchase),
-        description: editedProduct.description.trim(),
-        colorsAvailable: editedProduct.colorsAvailable.split(',').map(c => c.trim()).filter(c => c),
-        images: allImages,
-        clubId: editedProduct.clubId.trim(),
-        clubName: editedProduct.clubName.trim(),
-        customizationFields: Math.max(0, parseInt(editedProduct.customizationFields)) || 0,
-        price: Math.max(0, parseFloat(editedProduct.price)) || 0
-      };
-
-      const productRef = doc(db, 'merchandise', editingProductId);
-      await updateDoc(productRef, updateData);
-      setEditingProductId(null);
-    } catch (error) {
-      alert(`Error updating product: ${error.message}`);
-    }
-  };
-
-  const handleCancelEdit = () => {
-    setEditingProductId(null);
+  const resetForm = () => {
+    setFormData({
+      name: "",
+      type: "",
+      sizesAvailable: "",
+      lastDateToPurchase: "",
+      description: "",
+      colorsAvailable: "",
+      images: "",
+      clubId: "",
+      clubName: "",
+      customizationFields: "",
+      price: "",
+      imageFiles: [],
+    });
+    setIsEditing(false);
+    setCurrentProductId(null);
+    setUploadProgress(0);
   };
 
   const handleDeleteProduct = async (productId) => {
-    if (window.confirm('Are you sure you want to delete this product?')) {
+    if (window.confirm("Are you sure you want to delete this product?")) {
       try {
-        await deleteDoc(doc(db, 'merchandise', productId));
+        await deleteDoc(doc(db, "merchandise", productId));
+
+        // If deleting the product that's being edited, reset the form
+        if (currentProductId === productId) {
+          resetForm();
+        }
       } catch (error) {
         alert(`Error deleting product: ${error.message}`);
       }
     }
   };
 
-  const handleFileChange = (e, isEditing = false) => {
+  const handleFileChange = (e) => {
     const files = Array.from(e.target.files);
-    if (isEditing) {
-      setEditedProduct(prev => ({ ...prev, imageFiles: files }));
-    } else {
-      setNewProduct(prev => ({ ...prev, imageFiles: files }));
-    }
+    setFormData((prev) => ({ ...prev, imageFiles: files }));
   };
 
   return (
     <div>
-      <h1 className="text-3xl font-bold text-college-primary mb-6">Merchandise Management</h1>
+      <h1 className="text-3xl font-bold text-college-primary mb-6">
+        Merchandise Management
+      </h1>
 
-      {/* Add Product Form */}
+      {/* Product Form */}
       <div className="bg-white p-6 rounded-lg shadow-sm mb-8">
-        <h2 className="text-xl font-semibold mb-4">Add New Product</h2>
-        <form onSubmit={handleAddProduct} className="grid grid-cols-3 gap-4">
-          <input
-            type="text"
-            placeholder="Product Name"
-            className="p-2 border rounded"
-            value={newProduct.name}
-            onChange={(e) => setNewProduct(prev => ({ ...prev, name: e.target.value }))}
-            required
-          />
-          <input
-            type="text"
-            placeholder="Type (T-shirt, Hoodie, etc.)"
-            className="p-2 border rounded"
-            value={newProduct.type}
-            onChange={(e) => setNewProduct(prev => ({ ...prev, type: e.target.value }))}
-            required
-          />
-          <input
-            type="number"
-            placeholder="Price"
-            className="p-2 border rounded"
-            value={newProduct.price}
-            onChange={(e) => setNewProduct(prev => ({ ...prev, price: e.target.value }))}
-            required
-            min="0"
-            step="0.01"
-          />
-          <input
-            type="text"
-            placeholder="Sizes (comma separated)"
-            className="p-2 border rounded"
-            value={newProduct.sizesAvailable}
-            onChange={(e) => setNewProduct(prev => ({ ...prev, sizesAvailable: e.target.value }))}
-          />
-          <input
-            type="date"
-            className="p-2 border rounded"
-            value={newProduct.lastDateToPurchase}
-            onChange={(e) => setNewProduct(prev => ({ ...prev, lastDateToPurchase: e.target.value }))}
-            required
-          />
-          <input
-            type="text"
-            placeholder="Colors (comma separated)"
-            className="p-2 border rounded"
-            value={newProduct.colorsAvailable}
-            onChange={(e) => setNewProduct(prev => ({ ...prev, colorsAvailable: e.target.value }))}
-          />
-          <div className="col-span-2">
+        <h2 className="text-xl font-semibold mb-4">
+          {isEditing ? "Edit Product" : "Add New Product"}
+        </h2>
+        <form
+          onSubmit={handleSubmit}
+          className="grid grid-cols-1 md:grid-cols-3 gap-4"
+        >
+          {/* Basic Info */}
+          <div className="col-span-1">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Product Name
+            </label>
+            <input
+              type="text"
+              className="p-2 border rounded w-full"
+              value={formData.name}
+              onChange={(e) =>
+                setFormData((prev) => ({ ...prev, name: e.target.value }))
+              }
+              required
+            />
+          </div>
+
+          <div className="col-span-1">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Type
+            </label>
+            <input
+              type="text"
+              className="p-2 border rounded w-full"
+              placeholder="T-shirt, Hoodie, etc."
+              value={formData.type}
+              onChange={(e) =>
+                setFormData((prev) => ({ ...prev, type: e.target.value }))
+              }
+              required
+            />
+          </div>
+
+          <div className="col-span-1">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Price (₹)
+            </label>
+            <input
+              type="number"
+              className="p-2 border rounded w-full"
+              value={formData.price}
+              onChange={(e) =>
+                setFormData((prev) => ({ ...prev, price: e.target.value }))
+              }
+              required
+              min="0"
+              step="0.01"
+            />
+          </div>
+
+          {/* Product Options */}
+          <div className="col-span-1">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Available Sizes
+            </label>
+            <input
+              type="text"
+              className="p-2 border rounded w-full"
+              placeholder="S, M, L, XL (comma separated)"
+              value={formData.sizesAvailable}
+              onChange={(e) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  sizesAvailable: e.target.value,
+                }))
+              }
+            />
+          </div>
+
+          <div className="col-span-1">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Available Colors
+            </label>
+            <input
+              type="text"
+              className="p-2 border rounded w-full"
+              placeholder="Red, Blue, Green (comma separated)"
+              value={formData.colorsAvailable}
+              onChange={(e) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  colorsAvailable: e.target.value,
+                }))
+              }
+            />
+          </div>
+
+          <div className="col-span-1">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Last Date To Purchase
+            </label>
+            <input
+              type="date"
+              className="p-2 border rounded w-full"
+              value={formData.lastDateToPurchase}
+              onChange={(e) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  lastDateToPurchase: e.target.value,
+                }))
+              }
+              required
+            />
+          </div>
+
+          {/* Club Info */}
+          <div className="col-span-1">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Club ID
+            </label>
+            <input
+              type="text"
+              className="p-2 border rounded w-full"
+              value={formData.clubId}
+              onChange={(e) =>
+                setFormData((prev) => ({ ...prev, clubId: e.target.value }))
+              }
+            />
+          </div>
+
+          <div className="col-span-1">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Club Name
+            </label>
+            <input
+              type="text"
+              className="p-2 border rounded w-full"
+              value={formData.clubName}
+              onChange={(e) =>
+                setFormData((prev) => ({ ...prev, clubName: e.target.value }))
+              }
+            />
+          </div>
+
+          <div className="col-span-1">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Customization Fields
+            </label>
+            <input
+              type="number"
+              className="p-2 border rounded w-full"
+              value={formData.customizationFields}
+              onChange={(e) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  customizationFields: e.target.value,
+                }))
+              }
+              min="0"
+            />
+          </div>
+
+          {/* Description */}
+          <div className="col-span-3">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Description
+            </label>
+            <textarea
+              className="p-2 border rounded w-full"
+              value={formData.description}
+              onChange={(e) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  description: e.target.value,
+                }))
+              }
+              rows="3"
+            />
+          </div>
+
+          {/* Images */}
+          <div className="col-span-3">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Product Images
+            </label>
+
+            {formData.images && (
+              <div className="mb-2">
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {formData.images.split(",").map((url, index) => {
+                    const trimmedUrl = url.trim();
+                    if (trimmedUrl) {
+                      return (
+                        <img
+                          key={index}
+                          src={trimmedUrl}
+                          alt={`Product image ${index + 1}`}
+                          className="h-20 w-20 object-cover border rounded"
+                        />
+                      );
+                    }
+                    return null;
+                  })}
+                </div>
+                <p className="text-sm text-gray-500">Current images</p>
+              </div>
+            )}
+
             <input
               type="file"
               multiple
               accept="image/*"
               className="p-2 border rounded w-full"
-              onChange={(e) => handleFileChange(e, false)}
+              onChange={handleFileChange}
             />
+
             <input
               type="text"
               placeholder="Existing Image URLs (comma separated)"
               className="p-2 border rounded w-full mt-2"
-              value={newProduct.images}
-              onChange={(e) => setNewProduct(prev => ({ ...prev, images: e.target.value }))}
+              value={formData.images}
+              onChange={(e) =>
+                setFormData((prev) => ({ ...prev, images: e.target.value }))
+              }
             />
+
+            {isUploading && (
+              <div className="w-full bg-gray-200 rounded-full h-2.5 mt-2">
+                <div
+                  className="bg-college-primary h-2.5 rounded-full"
+                  style={{ width: `${uploadProgress}%` }}
+                ></div>
+                <p className="text-sm text-center">
+                  Uploading: {uploadProgress}%
+                </p>
+              </div>
+            )}
           </div>
-          <input
-            type="number"
-            placeholder="Customization Fields"
-            className="p-2 border rounded"
-            value={newProduct.customizationFields}
-            onChange={(e) => setNewProduct(prev => ({ ...prev, customizationFields: e.target.value }))}
-            min="0"
-          />
-          <textarea
-            placeholder="Description"
-            className="p-2 border rounded col-span-3"
-            value={newProduct.description}
-            onChange={(e) => setNewProduct(prev => ({ ...prev, description: e.target.value }))}
-            rows="3"
-          />
-          <input
-            type="text"
-            placeholder="Club ID"
-            className="p-2 border rounded"
-            value={newProduct.clubId}
-            onChange={(e) => setNewProduct(prev => ({ ...prev, clubId: e.target.value }))}
-          />
-          <input
-            type="text"
-            placeholder="Club Name"
-            className="p-2 border rounded"
-            value={newProduct.clubName}
-            onChange={(e) => setNewProduct(prev => ({ ...prev, clubName: e.target.value }))}
-          />
-          {isUploading && (
-            <div className="col-span-3">
-              <progress value={uploadProgress} max="100" className="w-full" />
-              <p className="text-center">Uploading: {uploadProgress}%</p>
-            </div>
-          )}
-          <button
-            type="submit"
-            className="col-span-3 bg-college-primary text-white py-2 px-4 rounded hover:bg-blue-900 disabled:opacity-50"
-            disabled={isUploading}
-          >
-            {isUploading ? 'Uploading...' : 'Add Product'}
-          </button>
+
+          {/* Form Actions */}
+          <div className="col-span-3 flex space-x-4 mt-2">
+            <button
+              type="submit"
+              className="bg-college-primary text-white py-2 px-4 rounded hover:bg-blue-900 flex-grow"
+              disabled={isUploading}
+            >
+              {isUploading
+                ? "Uploading..."
+                : isEditing
+                ? "Save Product"
+                : "Add Product"}
+            </button>
+
+            {isEditing && (
+              <button
+                type="button"
+                onClick={resetForm}
+                className="bg-gray-500 text-white py-2 px-4 rounded hover:bg-gray-600"
+              >
+                Cancel
+              </button>
+            )}
+          </div>
         </form>
       </div>
 
@@ -329,106 +488,30 @@ export default function MerchandiseManagement() {
             </tr>
           </thead>
           <tbody>
-            {products.map(product => (
+            {products.map((product) => (
               <tr key={product.id} className="border-b">
+                <td className="px-6 py-4">{product.name}</td>
+                <td className="px-6 py-4">{product.type}</td>
+                <td className="px-6 py-4">₹{product.price.toFixed(2)}</td>
                 <td className="px-6 py-4">
-                  {editingProductId === product.id ? (
-                    <input
-                      type="text"
-                      value={editedProduct.name}
-                      onChange={(e) => setEditedProduct(prev => ({ ...prev, name: e.target.value }))}
-                      className="p-1 border rounded w-full"
-                      required
-                    />
-                  ) : (
-                    product.name
-                  )}
+                  {product.sizesAvailable.join(", ")}
                 </td>
                 <td className="px-6 py-4">
-                  {editingProductId === product.id ? (
-                    <input
-                      type="text"
-                      value={editedProduct.type}
-                      onChange={(e) => setEditedProduct(prev => ({ ...prev, type: e.target.value }))}
-                      className="p-1 border rounded w-full"
-                      required
-                    />
-                  ) : (
-                    product.type
-                  )}
-                </td>
-                <td className="px-6 py-4">
-                  {editingProductId === product.id ? (
-                    <input
-                      type="number"
-                      value={editedProduct.price}
-                      onChange={(e) => setEditedProduct(prev => ({ ...prev, price: e.target.value }))}
-                      className="p-1 border rounded w-full"
-                      required
-                      min="0"
-                      step="0.01"
-                    />
-                  ) : (
-                    `₹${product.price.toFixed(2)}`
-                  )}
-                </td>
-                <td className="px-6 py-4">
-                  {editingProductId === product.id ? (
-                    <input
-                      type="text"
-                      value={editedProduct.sizesAvailable}
-                      onChange={(e) => setEditedProduct(prev => ({ ...prev, sizesAvailable: e.target.value }))}
-                      className="p-1 border rounded w-full"
-                    />
-                  ) : (
-                    product.sizesAvailable.join(', ')
-                  )}
-                </td>
-                <td className="px-6 py-4">
-                  {editingProductId === product.id ? (
-                    <input
-                      type="date"
-                      value={editedProduct.lastDateToPurchase}
-                      onChange={(e) => setEditedProduct(prev => ({ ...prev, lastDateToPurchase: e.target.value }))}
-                      className="p-1 border rounded w-full"
-                      required
-                    />
-                  ) : (
-                    product.lastDateToPurchase?.toLocaleDateString()
-                  )}
+                  {product.lastDateToPurchase?.toLocaleDateString()}
                 </td>
                 <td className="px-6 py-4 space-x-2">
-                  {editingProductId === product.id ? (
-                    <>
-                      <button 
-                        onClick={handleSaveEdit}
-                        className="text-green-600 hover:text-green-800"
-                      >
-                        Save
-                      </button>
-                      <button 
-                        onClick={handleCancelEdit}
-                        className="text-gray-600 hover:text-gray-800"
-                      >
-                        Cancel
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <button 
-                        onClick={() => handleEditClick(product)}
-                        className="text-blue-600 hover:text-blue-800"
-                      >
-                        Edit
-                      </button>
-                      <button 
-                        onClick={() => handleDeleteProduct(product.id)}
-                        className="text-red-600 hover:text-red-800"
-                      >
-                        Delete
-                      </button>
-                    </>
-                  )}
+                  <button
+                    onClick={() => handleEditClick(product)}
+                    className="text-blue-600 hover:text-blue-800"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => handleDeleteProduct(product.id)}
+                    className="text-red-600 hover:text-red-800"
+                  >
+                    Delete
+                  </button>
                 </td>
               </tr>
             ))}
