@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'tabs/home_tab.dart';
 import 'tabs/clubs_events.dart';
 import 'tabs/profile_tab.dart';
-import 'tabs/settings_tab.dart';
-import 'tabs/notifications_tab.dart';
+import 'tabs/ride_sharing_tab.dart';
+import 'tabs/merchandise_tab.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -18,9 +18,9 @@ class _HomeScreenState extends State<HomeScreen> {
   final List<Widget> _tabs = [
     const HomeTab(),
     const ClubsEventsTab(),
-    const NotificationsTab(),
+    const MerchandiseTab(),
+    const RideSharingTab(),
     const ProfileTab(),
-    const SettingsTab(),
   ];
 
   @override
@@ -38,14 +38,14 @@ class _HomeScreenState extends State<HomeScreen> {
             label: 'Clubs & Events',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.notifications),
-            label: 'Notifications',
+            icon: Icon(Icons.shopping_cart),
+            label: 'Merchandise',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.directions_car),
+            label: 'Ride Sharing',
           ),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.settings),
-            label: 'Settings',
-          ),
         ],
       ),
     );

@@ -52,3 +52,4 @@ android/secrets.properties
 
 firebase_options.dart
 android/app/google-services.json
+*.env

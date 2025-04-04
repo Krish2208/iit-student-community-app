@@ -1,14 +1,28 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 
 import 'firebase_options.dart';
 import 'services/auth_service.dart';
-import 'screens/login_screen.dart';
+import 'services/notification_service.dart';
+import 'package:iiti_student_community/wrappers/auth_wrapper.dart';
+
+// Background message handler must be top-level function
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp();
+}
 
 Future<void> main() async {
+  await dotenv.load(fileName: ".env");
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  
+  // Register background handler
+  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+  
   runApp(const MyApp());
 }
 
@@ -17,16 +31,19 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => AuthService(),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => AuthService()),
+      ],
       child: MaterialApp(
         title: 'My App',
         theme: ThemeData(primarySwatch: Colors.blue),
-        home: const LoginScreen(),
+        home: const AuthWrapper(),
       ),
     );
   }
 }
+
 
 // class MyApp extends StatelessWidget {
 //   const MyApp({super.key});

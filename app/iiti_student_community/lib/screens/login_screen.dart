@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../services/auth_service.dart';
-import 'home_screen.dart';
+import 'package:iiti_student_community/services/auth_service.dart';
 
 class LoginScreen extends StatelessWidget {
   const LoginScreen({super.key});
@@ -23,13 +22,8 @@ class LoginScreen extends StatelessWidget {
               label: const Text('Continue with Google'),
               onPressed: () async {
                 final authService = context.read<AuthService>();
-                final userCredential = await authService.signInWithGoogle();
-                if (userCredential != null && context.mounted) {
-                  Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(builder: (_) => const HomeScreen()),
-                  );
-                }
+                await authService.signInWithGoogle();
+                // No need to navigate manually - the AuthWrapper will handle it
               },
             ),
           ],

@@ -35,26 +35,21 @@ class _ClubDetailsPageState extends State<ClubDetailsPage> {
         return;
       }
 
-      final clubRef = FirebaseFirestore.instance
-          .collection('clubs')
-          .doc(club.id);
-
-      if (club.isSubscribed) {
-        // Unsubscribe
-        await clubRef.update({
-          'subscribers': FieldValue.arrayRemove([userId]),
-        });
-      } else {
-        // Subscribe
-        await clubRef.update({
-          'subscribers': FieldValue.arrayUnion([userId]),
-        });
-      }
+      // Use the new method that handles notifications
+      await club.toggleSubscriptionWithNotification(context);
 
       // Update local state
       setState(() {
         club.isSubscribed = !club.isSubscribed;
       });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(club.isSubscribed 
+              ? 'You will now receive notifications for events from ${club.name}'
+              : 'You will no longer receive notifications from ${club.name}'),
+        ),
+      );
     } catch (e) {
       ScaffoldMessenger.of(
         context,
