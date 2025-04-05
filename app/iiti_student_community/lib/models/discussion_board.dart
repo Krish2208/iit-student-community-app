@@ -22,7 +22,7 @@ class DiscussionPost {
       content: data['content'] ?? '',
       userId: data['userId'] ?? '',
       userEmail: data['userEmail'] ?? '',
-      timestamp: (data['timestamp'] as Timestamp).toDate(),
+      timestamp: (data['timestamp'] as Timestamp?)?.toDate() ?? DateTime.now(),
     );
   }
 
