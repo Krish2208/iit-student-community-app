@@ -29,7 +29,8 @@ Follow our detailed setup guide:
 - Razorpay API  
 - Google Maps SDK for Android/iOS  
 - Google Places SDK  
-- Google Geocode SDK  
+- Google Geocode SDK
+- Local Calendar Service (Google Calendar for Android, Apple Calendar for iOS)
 
 ## 📁 Code Structure
 ```
@@ -46,6 +47,7 @@ Follow our detailed setup guide:
 │   └── subscribed_event.dart                 # User-subscribed events UI
 ├── models/                                   # Data models
 │   ├── club.dart                             # Club entity model
+│   ├── discussion_board.dart                 # Discussion Board Post model
 │   ├── event.dart                            # Event entity model
 │   ├── places_suggestion.dart                # Location autocomplete results
 │   ├── product.dart                          # Merchandise item model
@@ -53,6 +55,7 @@ Follow our detailed setup guide:
 │   └── user.dart                             # User entity model
 ├── screens/                                  # Application views
 │   ├── clubs_details_screen.dart             # Club-specific details
+│   ├── discussion_board_screen.dart          # Discussion Post Screen
 │   ├── event_details_screen.dart             # Event-specific details
 │   ├── home_screen.dart                      # Primary dashboard
 │   ├── login_screen.dart                     # Authentication interface
@@ -62,6 +65,7 @@ Follow our detailed setup guide:
 │   └── ride_request_screen.dart              # Ride-sharing screen
 ├── screens/tabs/                             # Navigation tab components
 │   ├── clubs_events.dart                     # Combined clubs/events view
+│   ├── discussion_board_tab.dart             # Discussion Board tab
 │   ├── home_tab.dart                         # Default landing tab
 │   ├── merchandise_tab.dart                  # Shop tab for merchandise
 │   ├── profile_tab.dart                      # User profile management

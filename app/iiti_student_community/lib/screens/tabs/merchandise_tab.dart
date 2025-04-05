@@ -229,7 +229,7 @@ class _MerchandiseTabState extends State<MerchandiseTab> {
                       gridDelegate:
                           const SliverGridDelegateWithFixedCrossAxisCount(
                             crossAxisCount: 2,
-                            childAspectRatio: 0.7,
+                            childAspectRatio: 0.6,
                             crossAxisSpacing: 16,
                             mainAxisSpacing: 16,
                           ),

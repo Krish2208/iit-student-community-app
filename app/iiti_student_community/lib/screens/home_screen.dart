@@ -9,6 +9,7 @@ import 'tabs/clubs_events.dart';
 import 'tabs/profile_tab.dart';
 import 'tabs/ride_sharing_tab.dart';
 import 'tabs/merchandise_tab.dart';
+import 'tabs/discussion_board_tab.dart';
 import 'package:iiti_student_community/services/notification_service.dart';
 import 'package:iiti_student_community/screens/event_details_screen.dart';
 
@@ -27,6 +28,7 @@ class _HomeScreenState extends State<HomeScreen> {
     const ClubsEventsTab(),
     const MerchandiseTab(),
     const RideSharingTab(),
+    const DiscussionBoardTab(),
     const ProfileTab(),
   ];
 
@@ -164,6 +166,10 @@ class _HomeScreenState extends State<HomeScreen> {
           BottomNavigationBarItem(
             icon: Icon(Icons.directions_car),
             label: 'Ride Sharing',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.forum),
+            label: 'Discussion'
           ),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
         ],
