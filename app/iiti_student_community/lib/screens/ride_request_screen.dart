@@ -228,6 +228,7 @@ class _CreateRideRequestPageState extends State<CreateRideRequestPage> {
         await FirebaseFirestore.instance.collection('ride_requests').add({
           'userId': user.uid,
           'userName': user.displayName,
+          'userEmail': user.email,
           'userPhotoUrl': user.photoURL,
           'location': _locationController.text,
           'dateTime': Timestamp.fromDate(rideDateTime),

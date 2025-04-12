@@ -57,7 +57,7 @@ class _RideSharingTabState extends State<RideSharingTab> {
         'https://maps.googleapis.com/maps/api/place/autocomplete/json?'
         'input=$input&'
         'components=country:in&'
-        'key=$kGoogleApiKey'
+        'key=$kGoogleApiKey',
       );
 
       final response = await http.get(url);
@@ -66,12 +66,15 @@ class _RideSharingTabState extends State<RideSharingTab> {
       if (data['status'] == 'OK') {
         final List<dynamic> predictions = data['predictions'];
         setState(() {
-          _placeSuggestions = predictions
-              .map((prediction) => PlaceSuggestion(
-                    description: prediction['description'],
-                    placeId: prediction['place_id'],
-                  ))
-              .toList();
+          _placeSuggestions =
+              predictions
+                  .map(
+                    (prediction) => PlaceSuggestion(
+                      description: prediction['description'],
+                      placeId: prediction['place_id'],
+                    ),
+                  )
+                  .toList();
           _showSuggestions = true;
         });
       } else {
@@ -81,9 +84,9 @@ class _RideSharingTabState extends State<RideSharingTab> {
         });
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error getting suggestions: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error getting suggestions: $e')));
     }
   }
 
@@ -99,7 +102,7 @@ class _RideSharingTabState extends State<RideSharingTab> {
         'https://maps.googleapis.com/maps/api/place/details/json?'
         'place_id=$placeId&'
         'fields=geometry,name,formatted_address&'
-        'key=$kGoogleApiKey'
+        'key=$kGoogleApiKey',
       );
 
       final response = await http.get(url);
@@ -111,16 +114,15 @@ class _RideSharingTabState extends State<RideSharingTab> {
         final location = geometry['location'];
 
         setState(() {
-          _selectedLocation = LatLng(
-            location['lat'],
-            location['lng'],
-          );
+          _selectedLocation = LatLng(location['lat'], location['lng']);
           _selectedLocationName = result['formatted_address'] ?? result['name'];
           _searchController.text = _selectedLocationName!;
         });
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error getting place details: ${data['status']}')),
+          SnackBar(
+            content: Text('Error getting place details: ${data['status']}'),
+          ),
         );
       }
     } catch (e) {
@@ -156,14 +158,18 @@ class _RideSharingTabState extends State<RideSharingTab> {
                   // Date filter
                   ListTile(
                     leading: const Icon(Icons.calendar_today),
-                    title: Text(_filterDate != null
-                        ? DateFormat('EEE, MMM d, yyyy').format(_filterDate!)
-                        : 'Select Date'),
+                    title: Text(
+                      _filterDate != null
+                          ? DateFormat('EEE, MMM d, yyyy').format(_filterDate!)
+                          : 'Select Date',
+                    ),
                     onTap: () async {
                       final DateTime? picked = await showDatePicker(
                         context: context,
                         initialDate: _filterDate ?? DateTime.now(),
-                        firstDate: DateTime.now().subtract(const Duration(days: 30)),
+                        firstDate: DateTime.now().subtract(
+                          const Duration(days: 30),
+                        ),
                         lastDate: DateTime.now().add(const Duration(days: 30)),
                       );
                       if (picked != null) {
@@ -209,13 +215,23 @@ class _RideSharingTabState extends State<RideSharingTab> {
   }
 
   // Calculate distance between two coordinates in kilometers using Haversine formula
-  double _calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+  double _calculateDistance(
+    double lat1,
+    double lon1,
+    double lat2,
+    double lon2,
+  ) {
     const p = math.pi / 180;
     const earthRadiusKm = 6371.0;
-    
-    final a = 0.5 - math.cos((lat2 - lat1) * p) / 2 +
-        math.cos(lat1 * p) * math.cos(lat2 * p) * (1 - math.cos((lon2 - lon1) * p)) / 2;
-    
+
+    final a =
+        0.5 -
+        math.cos((lat2 - lat1) * p) / 2 +
+        math.cos(lat1 * p) *
+            math.cos(lat2 * p) *
+            (1 - math.cos((lon2 - lon1) * p)) /
+            2;
+
     return earthRadiusKm * 2 * math.asin(math.sqrt(a));
   }
 
@@ -243,16 +259,17 @@ class _RideSharingTabState extends State<RideSharingTab> {
         _filterDate!.year,
         _filterDate!.month,
         _filterDate!.day,
-        23, 59, 59,
+        23,
+        59,
+        59,
       );
 
-      query = query.where(
-        'dateTime',
-        isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay),
-      ).where(
-        'dateTime',
-        isLessThanOrEqualTo: Timestamp.fromDate(endOfDay),
-      );
+      query = query
+          .where(
+            'dateTime',
+            isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay),
+          )
+          .where('dateTime', isLessThanOrEqualTo: Timestamp.fromDate(endOfDay));
     } else {
       // Default: show future rides
       query = query.where(
@@ -294,12 +311,13 @@ class _RideSharingTabState extends State<RideSharingTab> {
                       borderRadius: BorderRadius.circular(8.0),
                     ),
                     contentPadding: const EdgeInsets.symmetric(vertical: 0.0),
-                    suffixIcon: _searchController.text.isNotEmpty
-                        ? IconButton(
-                      icon: const Icon(Icons.clear),
-                      onPressed: _clearSearchFilters,
-                    )
-                        : null,
+                    suffixIcon:
+                        _searchController.text.isNotEmpty
+                            ? IconButton(
+                              icon: const Icon(Icons.clear),
+                              onPressed: _clearSearchFilters,
+                            )
+                            : null,
                   ),
                   onChanged: (value) {
                     if (_debounce?.isActive ?? false) _debounce!.cancel();
@@ -308,7 +326,7 @@ class _RideSharingTabState extends State<RideSharingTab> {
                     });
                   },
                 ),
-                
+
                 // Display place suggestions
                 if (_showSuggestions && _placeSuggestions.isNotEmpty)
                   Container(
@@ -328,8 +346,12 @@ class _RideSharingTabState extends State<RideSharingTab> {
                       shrinkWrap: true,
                       padding: EdgeInsets.zero,
                       physics: const NeverScrollableScrollPhysics(),
-                      itemCount: _placeSuggestions.length > 5 ? 5 : _placeSuggestions.length,
-                      separatorBuilder: (context, index) => const Divider(height: 1),
+                      itemCount:
+                          _placeSuggestions.length > 5
+                              ? 5
+                              : _placeSuggestions.length,
+                      separatorBuilder:
+                          (context, index) => const Divider(height: 1),
                       itemBuilder: (context, index) {
                         final suggestion = _placeSuggestions[index];
                         return ListTile(
@@ -370,9 +392,11 @@ class _RideSharingTabState extends State<RideSharingTab> {
                       ),
                     if (_selectedLocationName != null)
                       Chip(
-                        label: Text(_selectedLocationName!.length > 20 
-                          ? '${_selectedLocationName!.substring(0, 20)}...' 
-                          : _selectedLocationName!),
+                        label: Text(
+                          _selectedLocationName!.length > 20
+                              ? '${_selectedLocationName!.substring(0, 20)}...'
+                              : _selectedLocationName!,
+                        ),
                         deleteIcon: const Icon(Icons.close, size: 18),
                         onDeleted: _clearSearchFilters,
                       ),
@@ -384,146 +408,195 @@ class _RideSharingTabState extends State<RideSharingTab> {
           // Ride requests list
           _isLoading
               ? const Expanded(
-                  child: Center(child: CircularProgressIndicator()),
-                )
+                child: Center(child: CircularProgressIndicator()),
+              )
               : Expanded(
-                  child: StreamBuilder<QuerySnapshot>(
-                    stream: _getRideRequestsStream(),
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
-                        return const Center(child: CircularProgressIndicator());
+                child: StreamBuilder<QuerySnapshot>(
+                  stream: _getRideRequestsStream(),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting &&
+                        !snapshot.hasData) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+
+                    if (snapshot.hasError) {
+                      return Center(child: Text('Error: ${snapshot.error}'));
+                    }
+
+                    if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                      return const Center(
+                        child: Text('No ride requests found'),
+                      );
+                    }
+
+                    var rideRequests = snapshot.data!.docs;
+
+                    // Filter by location proximity if location is selected
+                    if (_selectedLocation != null) {
+                      rideRequests =
+                          rideRequests.where((request) {
+                            final data = request.data() as Map<String, dynamic>;
+
+                            // Check if this ride request has coordinates
+                            if (data['coordinates'] != null) {
+                              final GeoPoint coordinates =
+                                  data['coordinates'] as GeoPoint;
+                              // Calculate distance between selected location and ride request location
+                              final distance = _calculateDistance(
+                                _selectedLocation!.latitude,
+                                _selectedLocation!.longitude,
+                                coordinates.latitude,
+                                coordinates.longitude,
+                              );
+
+                              // Return true if within 5 km
+                              return distance <= 5.0;
+                            }
+                            return false;
+                          }).toList();
+
+                      if (rideRequests.isEmpty) {
+                        return Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.location_off,
+                                size: 48,
+                                color: Colors.grey,
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                'No rides found within 5km of "${_selectedLocationName}"',
+                              ),
+                            ],
+                          ),
+                        );
                       }
+                    }
 
-                      if (snapshot.hasError) {
-                        return Center(child: Text('Error: ${snapshot.error}'));
-                      }
+                    return ListView.builder(
+                      padding: const EdgeInsets.all(8.0),
+                      itemCount: rideRequests.length,
+                      itemBuilder: (context, index) {
+                        final request = rideRequests[index];
+                        final data = request.data() as Map<String, dynamic>;
 
-                      if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                        return const Center(child: Text('No ride requests found'));
-                      }
+                        final DateTime dateTime =
+                            (data['dateTime'] as Timestamp).toDate();
+                        final String location =
+                            data['location'] ?? 'Unknown location';
+                        final String userName = data['userName'] ?? 'Anonymous';
+                        final String? userPhotoUrl = data['userPhotoUrl'];
+                        final bool isPast = dateTime.isBefore(DateTime.now());
 
-                      var rideRequests = snapshot.data!.docs;
+                        // Calculate distance if we have a selected location
+                        String? distanceText;
+                        if (_selectedLocation != null &&
+                            data['coordinates'] != null) {
+                          final GeoPoint coordinates =
+                              data['coordinates'] as GeoPoint;
+                          final double distance = _calculateDistance(
+                            _selectedLocation!.latitude,
+                            _selectedLocation!.longitude,
+                            coordinates.latitude,
+                            coordinates.longitude,
+                          );
+                          distanceText =
+                              '${distance.toStringAsFixed(1)} km away';
+                        }
 
-                      // Filter by location proximity if location is selected
-                      if (_selectedLocation != null) {
-                        rideRequests = rideRequests.where((request) {
-                          final data = request.data() as Map<String, dynamic>;
-                          
-                          // Check if this ride request has coordinates
-                          if (data['coordinates'] != null) {
-                            final GeoPoint coordinates = data['coordinates'] as GeoPoint;
-                            // Calculate distance between selected location and ride request location
-                            final distance = _calculateDistance(
-                              _selectedLocation!.latitude,
-                              _selectedLocation!.longitude,
-                              coordinates.latitude,
-                              coordinates.longitude,
-                            );
-                            
-                            // Return true if within 5 km
-                            return distance <= 5.0;
-                          }
-                          return false;
-                        }).toList();
-
-                        if (rideRequests.isEmpty) {
-                          return Center(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
+                        return Card(
+                          margin: const EdgeInsets.symmetric(
+                            vertical: 4.0,
+                            horizontal: 8.0,
+                          ),
+                          child: ListTile(
+                            leading: CircleAvatar(
+                              backgroundImage:
+                                  userPhotoUrl != null
+                                      ? NetworkImage(userPhotoUrl)
+                                      : null,
+                              child:
+                                  userPhotoUrl == null
+                                      ? const Icon(Icons.person)
+                                      : null,
+                            ),
+                            title: Text(
+                              location,
+                              style:
+                                  isPast
+                                      ? TextStyle(color: Colors.grey[600])
+                                      : null,
+                            ),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Icon(Icons.location_off, size: 48, color: Colors.grey),
-                                const SizedBox(height: 16),
-                                Text('No rides found within 5km of "${_selectedLocationName}"'),
+                                Text(
+                                  '${DateFormat('EEE, MMM d').format(dateTime)} at ${DateFormat('h:mm a').format(dateTime)}',
+                                  style:
+                                      isPast
+                                          ? TextStyle(color: Colors.grey[500])
+                                          : null,
+                                ),
+                                Text(
+                                  'by $userName',
+                                  style: TextStyle(
+                                    color: Colors.grey[600],
+                                    fontSize: 12,
+                                  ),
+                                ),
+                                if (distanceText != null)
+                                  Text(
+                                    distanceText,
+                                    style: TextStyle(
+                                      color: Colors.blue[700],
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
                               ],
                             ),
-                          );
-                        }
-                      }
-
-                      return ListView.builder(
-                        padding: const EdgeInsets.all(8.0),
-                        itemCount: rideRequests.length,
-                        itemBuilder: (context, index) {
-                          final request = rideRequests[index];
-                          final data = request.data() as Map<String, dynamic>;
-
-                          final DateTime dateTime = (data['dateTime'] as Timestamp).toDate();
-                          final String location = data['location'] ?? 'Unknown location';
-                          final String userName = data['userName'] ?? 'Anonymous';
-                          final String? userPhotoUrl = data['userPhotoUrl'];
-                          final bool isPast = dateTime.isBefore(DateTime.now());
-
-                          // Calculate distance if we have a selected location
-                          String? distanceText;
-                          if (_selectedLocation != null && data['coordinates'] != null) {
-                            final GeoPoint coordinates = data['coordinates'] as GeoPoint;
-                            final double distance = _calculateDistance(
-                              _selectedLocation!.latitude,
-                              _selectedLocation!.longitude,
-                              coordinates.latitude,
-                              coordinates.longitude,
-                            );
-                            distanceText = '${distance.toStringAsFixed(1)} km away';
-                          }
-
-                          return Card(
-                            margin: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 8.0),
-                            child: ListTile(
-                              leading: CircleAvatar(
-                                backgroundImage: userPhotoUrl != null ? NetworkImage(userPhotoUrl) : null,
-                                child: userPhotoUrl == null ? const Icon(Icons.person) : null,
-                              ),
-                              title: Text(
-                                location,
-                                style: isPast ? TextStyle(color: Colors.grey[600]) : null,
-                              ),
-                              subtitle: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    '${DateFormat('EEE, MMM d').format(dateTime)} at ${DateFormat('h:mm a').format(dateTime)}',
-                                    style: isPast ? TextStyle(color: Colors.grey[500]) : null,
-                                  ),
-                                  Text(
-                                    'by $userName',
-                                    style: TextStyle(color: Colors.grey[600], fontSize: 12),
-                                  ),
-                                  if (distanceText != null)
-                                    Text(
-                                      distanceText,
-                                      style: TextStyle(
-                                        color: Colors.blue[700],
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.bold,
+                            isThreeLine: true,
+                            trailing:
+                                isPast
+                                    ? const Chip(
+                                      label: Text(
+                                        'Past',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 12,
+                                        ),
                                       ),
-                                    ),
-                                ],
-                              ),
-                              isThreeLine: true,
-                              trailing: isPast
-                                  ? const Chip(
-                                label: Text('Past', style: TextStyle(color: Colors.white, fontSize: 12)),
-                                backgroundColor: Colors.grey,
-                                padding: EdgeInsets.symmetric(horizontal: 4),
-                              )
-                                  : null,
-                              onTap: () {
-                                _showRideRequestDetails(context, data, request.id);
-                              },
-                            ),
-                          );
-                        },
-                      );
-                    },
-                  ),
+                                      backgroundColor: Colors.grey,
+                                      padding: EdgeInsets.symmetric(
+                                        horizontal: 4,
+                                      ),
+                                    )
+                                    : null,
+                            onTap: () {
+                              _showRideRequestDetails(
+                                context,
+                                data,
+                                request.id,
+                              );
+                            },
+                          ),
+                        );
+                      },
+                    );
+                  },
                 ),
+              ),
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
           Navigator.push(
             context,
-            MaterialPageRoute(builder: (context) => const CreateRideRequestPage()),
+            MaterialPageRoute(
+              builder: (context) => const CreateRideRequestPage(),
+            ),
           );
         },
         icon: const Icon(Icons.add),
@@ -533,10 +606,10 @@ class _RideSharingTabState extends State<RideSharingTab> {
   }
 
   void _showRideRequestDetails(
-      BuildContext context,
-      Map<String, dynamic> data,
-      String requestId,
-      ) {
+    BuildContext context,
+    Map<String, dynamic> data,
+    String requestId,
+  ) {
     final DateTime dateTime = (data['dateTime'] as Timestamp).toDate();
     final currentUserId = FirebaseAuth.instance.currentUser?.uid;
     final isOwner = currentUserId == data['userId'];
@@ -579,7 +652,7 @@ class _RideSharingTabState extends State<RideSharingTab> {
                 'Date: ${DateFormat('EEEE, MMMM d, yyyy').format(dateTime)}',
               ),
               Text('Time: ${DateFormat('h:mm a').format(dateTime)}'),
-              
+
               if (distanceText != null) ...[
                 const SizedBox(height: 8.0),
                 Text(
@@ -590,15 +663,21 @@ class _RideSharingTabState extends State<RideSharingTab> {
                   ),
                 ),
               ],
-              
+
               const SizedBox(height: 16.0),
 
               // User info
               Row(
                 children: [
                   CircleAvatar(
-                    backgroundImage: data['userPhotoUrl'] != null ? NetworkImage(data['userPhotoUrl']) : null,
-                    child: data['userPhotoUrl'] == null ? const Icon(Icons.person) : null,
+                    backgroundImage:
+                        data['userPhotoUrl'] != null
+                            ? NetworkImage(data['userPhotoUrl'])
+                            : null,
+                    child:
+                        data['userPhotoUrl'] == null
+                            ? const Icon(Icons.person)
+                            : null,
                   ),
                   const SizedBox(width: 8.0),
                   Text('Posted by: ${data['userName'] ?? 'Anonymous'}'),
@@ -617,13 +696,14 @@ class _RideSharingTabState extends State<RideSharingTab> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => MapViewScreen(
-                          location: LatLng(
-                            geoPoint.latitude,
-                            geoPoint.longitude,
-                          ),
-                          title: data['location'] ?? 'Location',
-                        ),
+                        builder:
+                            (context) => MapViewScreen(
+                              location: LatLng(
+                                geoPoint.latitude,
+                                geoPoint.longitude,
+                              ),
+                              title: data['location'] ?? 'Location',
+                            ),
                       ),
                     );
                   },
@@ -649,18 +729,54 @@ class _RideSharingTabState extends State<RideSharingTab> {
                   ),
                 ),
               ] else ...[
-                ElevatedButton.icon(
-                  icon: const Icon(Icons.message),
-                  label: const Text('Contact Requester'),
-                  onPressed: () {
-                    // Implement contact functionality
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Contacting requester... (Not implemented)')),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    minimumSize: const Size(double.infinity, 40),
+                Container(
+                  padding: const EdgeInsets.all(12.0),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[100],
+                    borderRadius: BorderRadius.circular(8.0),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Requester Contact Information',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                          color: Colors.blue[800],
+                        ),
+                      ),
+                      const SizedBox(height: 8.0),
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.person,
+                            size: 18,
+                            color: Colors.grey,
+                          ),
+                          const SizedBox(width: 8.0),
+                          Expanded(
+                            child: Text(
+                              'Name: ${data['userName'] ?? 'Not provided'}',
+                              style: const TextStyle(fontSize: 15),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4.0),
+                      Row(
+                        children: [
+                          const Icon(Icons.email, size: 18, color: Colors.grey),
+                          const SizedBox(width: 8.0),
+                          Expanded(
+                            child: Text(
+                              'Email: ${data['userEmail'] ?? 'Not provided'}',
+                              style: const TextStyle(fontSize: 15),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -671,7 +787,10 @@ class _RideSharingTabState extends State<RideSharingTab> {
     );
   }
 
-  Future<void> _deleteRideRequest(BuildContext context, String requestId) async {
+  Future<void> _deleteRideRequest(
+    BuildContext context,
+    String requestId,
+  ) async {
     setState(() {
       _isLoading = true;
     });
@@ -682,9 +801,9 @@ class _RideSharingTabState extends State<RideSharingTab> {
           .doc(requestId)
           .delete();
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Ride request deleted')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Ride request deleted')));
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error deleting ride request: $e')),
