@@ -12,6 +12,7 @@ import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 
 export default function MerchandiseManagement() {
   const [products, setProducts] = useState([]);
+  const [clubs, setClubs] = useState([]);
   const [formData, setFormData] = useState({
     name: "",
     type: "",
@@ -19,18 +20,31 @@ export default function MerchandiseManagement() {
     lastDateToPurchase: "",
     description: "",
     colorsAvailable: "",
-    images: "",
     clubId: "",
     clubName: "",
     customizationFields: "",
     price: "",
+    images: [],
     imageFiles: [],
+    imagesToRemove: [],
   });
 
   const [isEditing, setIsEditing] = useState(false);
   const [currentProductId, setCurrentProductId] = useState(null);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
+
+  // Fetch clubs for the dropdown
+  useEffect(() => {
+    const unsubscribe = onSnapshot(collection(db, "clubs"), (snapshot) => {
+      const clubsData = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        name: doc.data().name,
+      }));
+      setClubs(clubsData);
+    });
+    return () => unsubscribe();
+  }, []);
 
   useEffect(() => {
     const unsubscribe = onSnapshot(
@@ -46,6 +60,18 @@ export default function MerchandiseManagement() {
     );
     return () => unsubscribe();
   }, []);
+
+  // Handle club selection change
+  const handleClubChange = (e) => {
+    const selectedClubId = e.target.value;
+    const selectedClub = clubs.find(club => club.id === selectedClubId);
+    
+    setFormData({
+      ...formData,
+      clubId: selectedClubId,
+      clubName: selectedClub ? selectedClub.name : "",
+    });
+  };
 
   const uploadFile = async (file) => {
     if (!file) return null;
@@ -88,11 +114,7 @@ export default function MerchandiseManagement() {
         );
       }
 
-      const existingUrls = formData.images
-        .split(",")
-        .map((i) => i.trim())
-        .filter((i) => i);
-      const allImages = [...existingUrls, ...imageUrls];
+      const allImages = [...formData.images, ...imageUrls];
 
       const productData = {
         name: formData.name.trim(),
@@ -152,11 +174,12 @@ export default function MerchandiseManagement() {
       lastDateToPurchase: formattedDate,
       description: product.description || "",
       colorsAvailable: product.colorsAvailable?.join(", ") || "",
-      images: product.images?.join(", ") || "",
       clubId: product.clubId || "",
       clubName: product.clubName || "",
       customizationFields: product.customizationFields || "",
       price: product.price || "",
+      images: product.images || [],
+      imagesToRemove: [],
       imageFiles: [],
     });
 
@@ -172,11 +195,12 @@ export default function MerchandiseManagement() {
       lastDateToPurchase: "",
       description: "",
       colorsAvailable: "",
-      images: "",
       clubId: "",
       clubName: "",
       customizationFields: "",
       price: "",
+      images: [],
+      imagesToRemove: [],
       imageFiles: [],
     });
     setIsEditing(false);
@@ -202,6 +226,16 @@ export default function MerchandiseManagement() {
   const handleFileChange = (e) => {
     const files = Array.from(e.target.files);
     setFormData((prev) => ({ ...prev, imageFiles: files }));
+  };
+
+  const handleRemoveImage = (imageUrl) => {
+    if (formData.images.includes(imageUrl)) {
+      setFormData((prev) => ({
+        ...prev,
+        images: prev.images.filter((img) => img !== imageUrl),
+        imagesToRemove: [...prev.imagesToRemove, imageUrl],
+      }));
+    }
   };
 
   return (
@@ -323,33 +357,24 @@ export default function MerchandiseManagement() {
             />
           </div>
 
-          {/* Club Info */}
-          <div className="col-span-1">
+          {/* Club Info - Dropdown instead of input fields */}
+          <div className="col-span-2">
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Club ID
+              Club
             </label>
-            <input
-              type="text"
+            <select
               className="p-2 border rounded w-full"
               value={formData.clubId}
-              onChange={(e) =>
-                setFormData((prev) => ({ ...prev, clubId: e.target.value }))
-              }
-            />
-          </div>
-
-          <div className="col-span-1">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Club Name
-            </label>
-            <input
-              type="text"
-              className="p-2 border rounded w-full"
-              value={formData.clubName}
-              onChange={(e) =>
-                setFormData((prev) => ({ ...prev, clubName: e.target.value }))
-              }
-            />
+              onChange={handleClubChange}
+              required
+            >
+              <option value="">Select Club</option>
+              {clubs.map((club) => (
+                <option key={club.id} value={club.id}>
+                  {club.name}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div className="col-span-1">
@@ -394,23 +419,25 @@ export default function MerchandiseManagement() {
               Product Images
             </label>
 
-            {formData.images && (
+            {formData.images.length > 0 && (
               <div className="mb-2">
                 <div className="flex flex-wrap gap-2 mb-2">
-                  {formData.images.split(",").map((url, index) => {
-                    const trimmedUrl = url.trim();
-                    if (trimmedUrl) {
-                      return (
-                        <img
-                          key={index}
-                          src={trimmedUrl}
-                          alt={`Product image ${index + 1}`}
-                          className="h-20 w-20 object-cover border rounded"
-                        />
-                      );
-                    }
-                    return null;
-                  })}
+                  {formData.images.map((url, index) => (
+                    <div key={index} className="relative group">
+                      <img
+                        src={url}
+                        alt={`Product image ${index + 1}`}
+                        className="h-20 w-20 object-cover border rounded"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveImage(url)}
+                        className="absolute top-0 right-0 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
                 </div>
                 <p className="text-sm text-gray-500">Current images</p>
               </div>
@@ -422,16 +449,6 @@ export default function MerchandiseManagement() {
               accept="image/*"
               className="p-2 border rounded w-full"
               onChange={handleFileChange}
-            />
-
-            <input
-              type="text"
-              placeholder="Existing Image URLs (comma separated)"
-              className="p-2 border rounded w-full mt-2"
-              value={formData.images}
-              onChange={(e) =>
-                setFormData((prev) => ({ ...prev, images: e.target.value }))
-              }
             />
 
             {isUploading && (
@@ -483,38 +500,43 @@ export default function MerchandiseManagement() {
               <th className="px-6 py-3 text-left">Type</th>
               <th className="px-6 py-3 text-left">Price</th>
               <th className="px-6 py-3 text-left">Sizes</th>
+              <th className="px-6 py-3 text-left">Club</th>
               <th className="px-6 py-3 text-left">Last Date</th>
               <th className="px-6 py-3 text-left">Actions</th>
             </tr>
           </thead>
           <tbody>
-            {products.map((product) => (
-              <tr key={product.id} className="border-b">
-                <td className="px-6 py-4">{product.name}</td>
-                <td className="px-6 py-4">{product.type}</td>
-                <td className="px-6 py-4">₹{product.price.toFixed(2)}</td>
-                <td className="px-6 py-4">
-                  {product.sizesAvailable.join(", ")}
-                </td>
-                <td className="px-6 py-4">
-                  {product.lastDateToPurchase?.toLocaleDateString()}
-                </td>
-                <td className="px-6 py-4 space-x-2">
-                  <button
-                    onClick={() => handleEditClick(product)}
-                    className="text-blue-600 hover:text-blue-800"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => handleDeleteProduct(product.id)}
-                    className="text-red-600 hover:text-red-800"
-                  >
-                    Delete
-                  </button>
-                </td>
-              </tr>
-            ))}
+            {products.map((product) => {
+              const club = clubs.find((club) => club.id === product.clubId);
+              return (
+                <tr key={product.id} className="border-b">
+                  <td className="px-6 py-4">{product.name}</td>
+                  <td className="px-6 py-4">{product.type}</td>
+                  <td className="px-6 py-4">₹{product.price.toFixed(2)}</td>
+                  <td className="px-6 py-4">
+                    {product.sizesAvailable.join(", ")}
+                  </td>
+                  <td className="px-6 py-4">{club?.name || product.clubName || "Unknown"}</td>
+                  <td className="px-6 py-4">
+                    {product.lastDateToPurchase?.toLocaleDateString()}
+                  </td>
+                  <td className="px-6 py-4 space-x-2">
+                    <button
+                      onClick={() => handleEditClick(product)}
+                      className="text-blue-600 hover:text-blue-800"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => handleDeleteProduct(product.id)}
+                      className="text-red-600 hover:text-red-800"
+                    >
+                      Delete
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
