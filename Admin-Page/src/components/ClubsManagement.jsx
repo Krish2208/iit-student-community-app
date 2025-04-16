@@ -165,6 +165,22 @@ export default function ClubsManagement() {
     setUploadProgress(0);
   };
 
+  const handleRemovePhoto = () => {
+    setFormData({
+      ...formData,
+      photoUrl: "",
+      removePhoto: true,
+    });
+  };
+
+  const handleRemoveBanner = () => {
+    setFormData({
+      ...formData,
+      bannerUrl: "",
+      removeBanner: true,
+    });
+  };
+
   // Delete Club
   const handleDeleteClub = async (clubId) => {
     if (window.confirm("Are you sure you want to delete this club?")) {
@@ -223,6 +239,7 @@ export default function ClubsManagement() {
             />
           </div>
 
+          {/* Club Photo section */}
           <div>
             <label className="block mb-1 font-medium">Club Photo:</label>
             {formData.photoUrl && (
@@ -235,16 +252,10 @@ export default function ClubsManagement() {
                   />
                   <button
                     type="button"
-                    onClick={() =>
-                      setFormData({
-                        ...formData,
-                        photoUrl: "",
-                        removePhoto: true,
-                      })
-                    }
-                    className="text-red-600 hover:text-red-800 ml-2"
+                    onClick={handleRemovePhoto}
+                    className="text-red-600 hover:text-red-800 ml-2 bg-gray-100 rounded-full p-1 w-8 h-8 flex items-center justify-center"
                   >
-                    Remove
+                    ×
                   </button>
                 </div>
                 <p className="text-sm text-gray-500">Current photo</p>
@@ -260,6 +271,7 @@ export default function ClubsManagement() {
             />
           </div>
 
+          {/* Banner Image section */}
           <div>
             <label className="block mb-1 font-medium">Banner Image:</label>
             {formData.bannerUrl && (
@@ -272,16 +284,10 @@ export default function ClubsManagement() {
                   />
                   <button
                     type="button"
-                    onClick={() =>
-                      setFormData({
-                        ...formData,
-                        bannerUrl: "",
-                        removeBanner: true,
-                      })
-                    }
-                    className="text-red-600 hover:text-red-800 ml-2"
+                    onClick={handleRemoveBanner}
+                    className="text-red-600 hover:text-red-800 ml-2 bg-gray-100 rounded-full p-1 w-8 h-8 flex items-center justify-center"
                   >
-                    Remove
+                    ×
                   </button>
                 </div>
                 <p className="text-sm text-gray-500">Current banner</p>
