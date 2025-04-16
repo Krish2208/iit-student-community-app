@@ -10,7 +10,7 @@ Before proceeding, ensure the following are installed:
 ---
 
 ## Environment Configuration
-Create a `.env` file in the root directory of your project by copying the `.env.example` file. Replace `<YOUR_FIREBASE_API_KEY>`, `<YOUR_FIREBASE_MESSAGING_SENDER_ID>`, and `<YOUR_FIREBASE_APP_ID>` with your Firebase project credentials.
+Create a `.env` file in the root directory of your project by copying the `.env.example` file. Replace `<YOUR_FIREBASE_API_KEY>`, `<YOUR_FIREBASE_MESSAGING_SENDER_ID>`, and `<YOUR_FIREBASE_APP_ID>` with your Firebase project credentials. Replace `<YOUR_MAPS_API_KEY>` with your Google Cloud Maps SDK API key.
 
 ## Installation Steps
 
