@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { db } from "../firebase";
 import {
   collection,
@@ -12,20 +12,36 @@ import {
 import { getAuth } from "firebase/auth";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { storage } from "../firebase";
+import { GoogleMap, Marker, useJsApiLoader } from "@react-google-maps/api";
 
 export default function EventManagement() {
   const [events, setEvents] = useState([]);
+  const [clubs, setClubs] = useState([]);
   const [formData, setFormData] = useState({
     name: "",
     description: "",
     organizerId: "",
+    organizingBody: "",
     location: "",
     dateTime: "",
     posterFile: null,
     posterUrl: "",
     coordinates: { lat: "", lng: "" },
     attendees: [],
+    removePoster: false,
   });
+
+  // Set IIT Indore coordinates as default
+  const IIT_INDORE_COORDS = { lat: 22.5203, lng: 75.9207 };
+
+  // Load Google Maps API
+  const { isLoaded } = useJsApiLoader({
+    id: "google-map-script",
+    googleMapsApiKey: import.meta.env.VITE_MAPS_API_KEY,
+  });
+
+  const [map, setMap] = useState(null);
+  const [selectedLocation, setSelectedLocation] = useState(null);
 
   const [isEditing, setIsEditing] = useState(false);
   const [currentEventId, setCurrentEventId] = useState(null);
@@ -34,7 +50,19 @@ export default function EventManagement() {
 
   const auth = getAuth();
 
-  // Firestore data subscription
+  // Fetch clubs for the dropdown
+  useEffect(() => {
+    const unsubscribe = onSnapshot(collection(db, "clubs"), (snapshot) => {
+      const clubsData = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        name: doc.data().name,
+      }));
+      setClubs(clubsData);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Firestore data subscription for events
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, "events"), (snapshot) => {
       const eventsData = snapshot.docs.map((doc) => {
@@ -55,6 +83,42 @@ export default function EventManagement() {
     });
     return () => unsubscribe();
   }, []);
+
+  const onMapLoad = React.useCallback((map) => {
+    setMap(map);
+  }, []);
+
+  // Handle map click to set marker
+  const onMapClick = React.useCallback((e) => {
+    const lat = e.latLng.lat();
+    const lng = e.latLng.lng();
+
+    setSelectedLocation({ lat, lng });
+
+    // Update form data with new coordinates
+    setFormData((prev) => ({
+      ...prev,
+      coordinates: {
+        lat: lat.toString(),
+        lng: lng.toString(),
+      },
+    }));
+  }, []);
+
+  // Clear map when unmounting
+  const onUnmount = React.useCallback(() => {
+    setMap(null);
+  }, []);
+
+  // Handle organizing body change
+  const handleOrganizingBodyChange = (e) => {
+    const selectedClubId = e.target.value;
+    setFormData({
+      ...formData,
+      organizerId: selectedClubId,
+      organizingBody: selectedClubId,
+    });
+  };
 
   // Handle file upload
   const uploadFile = async (file) => {
@@ -109,11 +173,14 @@ export default function EventManagement() {
       // Upload poster if file exists
       if (formData.posterFile) {
         posterUrl = await uploadFile(formData.posterFile);
+      } else if (formData.removePoster) {
+        posterUrl = "";
       }
 
       const eventData = {
         name: formData.name,
         description: formData.description,
+        organizerId: formData.organizerId,
         location: formData.location,
         dateTime: new Date(formData.dateTime),
         posterUrl,
@@ -131,7 +198,9 @@ export default function EventManagement() {
         await updateDoc(doc(db, "events", currentEventId), eventData);
       } else {
         // Create new event
-        eventData.organizerId = auth.currentUser?.uid || "";
+        if (!eventData.organizerId) {
+          eventData.organizerId = auth.currentUser?.uid || "";
+        }
         eventData.attendees = [];
         await addDoc(collection(db, "events"), eventData);
       }
@@ -156,17 +225,30 @@ export default function EventManagement() {
       ? new Date(event.dateTime).toISOString().slice(0, 16)
       : "";
 
+    // If event has coordinates, set the selected location
+    if (event.coordinates) {
+      setSelectedLocation({
+        lat: event.coordinates.latitude,
+        lng: event.coordinates.longitude,
+      });
+    } else {
+      setSelectedLocation(null);
+    }
+
     // Set form data with event details
     setFormData({
       name: event.name || "",
       description: event.description || "",
+      organizerId: event.organizerId || "",
+      organizingBody: event.organizerId || "",
       location: event.location || "",
       dateTime: formattedDateTime,
       posterFile: null,
       posterUrl: event.posterUrl || "",
+      removePoster: false,
       coordinates: {
-        lat: event.coordinates?.latitude || "",
-        lng: event.coordinates?.longitude || "",
+        lat: event.coordinates?.latitude.toString() || "",
+        lng: event.coordinates?.longitude.toString() || "",
       },
       attendees: event.attendees || [],
     });
@@ -181,16 +263,27 @@ export default function EventManagement() {
       name: "",
       description: "",
       organizerId: "",
+      organizingBody: "",
       location: "",
       dateTime: "",
       posterFile: null,
       posterUrl: "",
       coordinates: { lat: "", lng: "" },
       attendees: [],
+      removePoster: false,
     });
     setIsEditing(false);
     setCurrentEventId(null);
     setUploadProgress(0);
+    setSelectedLocation(null);
+  };
+
+  const handleRemovePoster = () => {
+    setFormData({
+      ...formData,
+      posterUrl: "",
+      removePoster: true,
+    });
   };
 
   // Delete Event
@@ -248,15 +341,38 @@ export default function EventManagement() {
             }
             required
           />
+          <select
+            className="p-2 border rounded"
+            value={formData.organizingBody}
+            onChange={handleOrganizingBodyChange}
+            required
+          >
+            <option value="">Select Organizing Body</option>
+            {clubs.map((club) => (
+              <option key={club.id} value={club.id}>
+                {club.name}
+              </option>
+            ))}
+          </select>
+
           <div className="col-span-2">
             <label className="block mb-1">Event Poster:</label>
             {formData.posterUrl && (
               <div className="mb-2">
-                <img
-                  src={formData.posterUrl}
-                  alt="Current poster"
-                  className="h-20 object-cover mb-2"
-                />
+                <div className="flex items-center justify-between">
+                  <img
+                    src={formData.posterUrl}
+                    alt="Current poster"
+                    className="h-20 object-cover mb-2"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleRemovePoster}
+                    className="text-red-600 hover:text-red-800 ml-2 bg-gray-100 rounded-full p-1 w-8 h-8 flex items-center justify-center"
+                  >
+                    ×
+                  </button>
+                </div>
                 <p className="text-sm text-gray-500">Current poster</p>
               </div>
             )}
@@ -280,34 +396,113 @@ export default function EventManagement() {
               </div>
             )}
           </div>
-          <div className="col-span-2 grid grid-cols-2 gap-4">
-            <input
-              type="number"
-              placeholder="Latitude"
-              className="p-2 border rounded"
-              value={formData.coordinates.lat}
-              onChange={(e) =>
-                setFormData({
-                  ...formData,
-                  coordinates: { ...formData.coordinates, lat: e.target.value },
-                })
-              }
-              step="any"
-            />
-            <input
-              type="number"
-              placeholder="Longitude"
-              className="p-2 border rounded"
-              value={formData.coordinates.lng}
-              onChange={(e) =>
-                setFormData({
-                  ...formData,
-                  coordinates: { ...formData.coordinates, lng: e.target.value },
-                })
-              }
-              step="any"
-            />
+
+          <div className="col-span-2">
+            <label className="block text-sm font-medium mb-2">
+              Location on Map:
+            </label>
+
+            {isLoaded ? (
+              <div className="h-64 w-full mb-4 border rounded overflow-hidden">
+                <GoogleMap
+                  mapContainerStyle={{ width: "100%", height: "100%" }}
+                  center={selectedLocation || IIT_INDORE_COORDS}
+                  zoom={selectedLocation ? 15 : 13}
+                  onClick={onMapClick}
+                  onLoad={onMapLoad}
+                  onUnmount={onUnmount}
+                >
+                  {selectedLocation && (
+                    <Marker
+                      position={selectedLocation}
+                      draggable={true}
+                      onDragEnd={(e) => {
+                        const lat = e.latLng.lat();
+                        const lng = e.latLng.lng();
+                        setSelectedLocation({ lat, lng });
+                        setFormData((prev) => ({
+                          ...prev,
+                          coordinates: {
+                            lat: lat.toString(),
+                            lng: lng.toString(),
+                          },
+                        }));
+                      }}
+                    />
+                  )}
+                </GoogleMap>
+              </div>
+            ) : (
+              <div className="h-64 w-full flex items-center justify-center bg-gray-100 border rounded">
+                Loading Map...
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">
+                  Latitude:
+                </label>
+                <input
+                  type="text"
+                  placeholder="Latitude"
+                  className="p-2 border rounded w-full bg-gray-50"
+                  value={formData.coordinates.lat}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      coordinates: {
+                        ...formData.coordinates,
+                        lat: e.target.value,
+                      },
+                    })
+                  }
+                  readOnly
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">
+                  Longitude:
+                </label>
+                <input
+                  type="text"
+                  placeholder="Longitude"
+                  className="p-2 border rounded w-full bg-gray-50"
+                  value={formData.coordinates.lng}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      coordinates: {
+                        ...formData.coordinates,
+                        lng: e.target.value,
+                      },
+                    })
+                  }
+                  readOnly
+                />
+              </div>
+            </div>
+
+            <div className="mt-2 text-sm">
+              <button
+                type="button"
+                className="text-blue-600 underline"
+                onClick={() => {
+                  setSelectedLocation(IIT_INDORE_COORDS);
+                  setFormData((prev) => ({
+                    ...prev,
+                    coordinates: {
+                      lat: IIT_INDORE_COORDS.lat.toString(),
+                      lng: IIT_INDORE_COORDS.lng.toString(),
+                    },
+                  }));
+                }}
+              >
+                Reset to IIT Indore
+              </button>
+            </div>
           </div>
+
           <textarea
             placeholder="Description"
             className="p-2 border rounded col-span-2"
@@ -350,47 +545,52 @@ export default function EventManagement() {
               <th className="px-6 py-3 text-left">Event Name</th>
               <th className="px-6 py-3 text-left">Date & Time</th>
               <th className="px-6 py-3 text-left">Location</th>
+              <th className="px-6 py-3 text-left">Organizer</th>
               <th className="px-6 py-3 text-left">Poster</th>
               <th className="px-6 py-3 text-left">Attendees</th>
               <th className="px-6 py-3 text-left">Actions</th>
             </tr>
           </thead>
           <tbody>
-            {events.map((event) => (
-              <tr key={event.id} className="border-b">
-                <td className="px-6 py-4">{event.name}</td>
-                <td className="px-6 py-4">
-                  {event.dateTime?.toLocaleString()}
-                </td>
-                <td className="px-6 py-4">{event.location}</td>
-                <td className="px-6 py-4">
-                  {event.posterUrl ? (
-                    <img
-                      src={event.posterUrl}
-                      alt="Event poster"
-                      className="h-10 w-10 object-cover"
-                    />
-                  ) : (
-                    "No poster"
-                  )}
-                </td>
-                <td className="px-6 py-4">{event.attendees?.length || 0}</td>
-                <td className="px-6 py-4 space-x-2">
-                  <button
-                    onClick={() => handleEditClick(event)}
-                    className="text-blue-600 hover:text-blue-800"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => handleDeleteEvent(event.id)}
-                    className="text-red-600 hover:text-red-800"
-                  >
-                    Delete
-                  </button>
-                </td>
-              </tr>
-            ))}
+            {events.map((event) => {
+              const organizer = clubs.find((club) => club.id === event.organizerId);
+              return (
+                <tr key={event.id} className="border-b">
+                  <td className="px-6 py-4">{event.name}</td>
+                  <td className="px-6 py-4">
+                    {event.dateTime?.toLocaleString()}
+                  </td>
+                  <td className="px-6 py-4">{event.location}</td>
+                  <td className="px-6 py-4">{organizer?.name || "Unknown"}</td>
+                  <td className="px-6 py-4">
+                    {event.posterUrl ? (
+                      <img
+                        src={event.posterUrl}
+                        alt="Event poster"
+                        className="h-10 w-10 object-cover"
+                      />
+                    ) : (
+                      "No poster"
+                    )}
+                  </td>
+                  <td className="px-6 py-4">{event.attendees?.length || 0}</td>
+                  <td className="px-6 py-4 space-x-2">
+                    <button
+                      onClick={() => handleEditClick(event)}
+                      className="text-blue-600 hover:text-blue-800"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => handleDeleteEvent(event.id)}
+                      className="text-red-600 hover:text-red-800"
+                    >
+                      Delete
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
